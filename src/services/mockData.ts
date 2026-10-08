@@ -1,0 +1,605 @@
+import { Store, Category, Product, Combo, DeliveryZone, AdminUser, Order } from '../types';
+
+export const INITIAL_STORE: Store = {
+  id: 'adegatk',
+  slug: 'adegatk',
+  name: 'AdegaTK',
+  slogan: 'Seu pedido rápido, gelado e do seu jeito.',
+  description: 'A adega mais completa da região. Cervejas trincando, destilados premium, vinhos selecionados, combos exclusivos e entrega em tempo recorde!',
+  phone: '(11) 98765-4321',
+  whatsappNumber: '5511987654321',
+  instagram: '@adegatk_oficial',
+  address: 'Rua das Palmeiras, 750',
+  neighborhood: 'Vila Nova',
+  city: 'São Paulo',
+  state: 'SP',
+  zipCode: '04571-000',
+  minOrderValue: 20.0,
+  freeDeliveryOver: 150.0,
+  defaultDeliveryFee: 8.0,
+  estimatedDeliveryTime: '30 - 45 min',
+  isOpenOverride: null,
+  appearance: {
+    theme: 'dark-amber',
+    primaryColor: '#f59e0b', // Amber 500
+    accentColor: '#d97706',
+    bannerUrl: 'https://images.unsplash.com/photo-1510812431401-41d2bd2722f3?w=1400&auto=format&fit=crop&q=80',
+    logoUrl: 'https://images.unsplash.com/photo-1569529465841-dfecdab7503b?w=300&auto=format&fit=crop&q=80',
+  },
+  businessHours: [
+    { dayOfWeek: 0, dayName: 'Domingo', isOpen: true, openTime: '12:00', closeTime: '01:00' },
+    { dayOfWeek: 1, dayName: 'Segunda-feira', isOpen: true, openTime: '16:00', closeTime: '00:00' },
+    { dayOfWeek: 2, dayName: 'Terça-feira', isOpen: true, openTime: '16:00', closeTime: '01:00' },
+    { dayOfWeek: 3, dayName: 'Quarta-feira', isOpen: true, openTime: '16:00', closeTime: '01:00' },
+    { dayOfWeek: 4, dayName: 'Quinta-feira', isOpen: true, openTime: '16:00', closeTime: '02:00' },
+    { dayOfWeek: 5, dayName: 'Sexta-feira', isOpen: true, openTime: '14:00', closeTime: '04:00' },
+    { dayOfWeek: 6, dayName: 'Sábado', isOpen: true, openTime: '12:00', closeTime: '04:00' },
+  ],
+  payments: {
+    pix: true,
+    cash: true,
+    creditCard: true,
+    debitCard: true,
+    pixKey: 'tkadega85@gmail.com',
+    pixKeyType: 'email',
+    pixReceiverName: 'AdegaTK Distribuidora LTDA',
+  },
+};
+
+export const INITIAL_CATEGORIES: Category[] = [
+  { id: 'cat-cervejas', storeId: 'adegatk', name: 'Cervejas', icon: '🍺', description: 'Cervejas estupidamente geladas, nacionais e importadas', order: 1, isActive: true },
+  { id: 'cat-destilados', storeId: 'adegatk', name: 'Destilados', icon: '🥃', description: 'Whiskies, vodkas, gin, licores e tequilas originais', order: 2, isActive: true },
+  { id: 'cat-vinhos', storeId: 'adegatk', name: 'Vinhos & Espumantes', icon: '🍷', description: 'Vinhos finos, tintos, brancos e espumantes gelados', order: 3, isActive: true },
+  { id: 'cat-combos', storeId: 'adegatk', name: 'Combos Especiais', icon: '🎁', description: 'Kits prontos para a resenha com gelo, copos e energéticos', order: 4, isActive: true },
+  { id: 'cat-refrigerantes', storeId: 'adegatk', name: 'Refrigerantes', icon: '🥤', description: 'Lata, 1L, 2L e petiscos', order: 5, isActive: true },
+  { id: 'cat-energeticos', storeId: 'adegatk', name: 'Energéticos & Sucos', icon: '🧃', description: 'Red Bull, Monster, sucos e isotônicos', order: 6, isActive: true },
+  { id: 'cat-gelo', storeId: 'adegatk', name: 'Gelo & Carvão', icon: '🧊', description: 'Gelo em cubo, gelo saborizado e carvão vegetal', order: 7, isActive: true },
+  { id: 'cat-tabacaria', storeId: 'adegatk', name: 'Tabacaria', icon: '🚬', description: 'Sedas, essências, carvão e artigos', order: 8, isActive: true },
+  { id: 'cat-petiscos', storeId: 'adegatk', name: 'Conveniência & Petiscos', icon: '🍫', description: 'Salgadinhos, chocolates, amendoins e copos', order: 9, isActive: true },
+  { id: 'cat-outras', storeId: 'adegatk', name: 'Bebidas Mistas', icon: '🍸', description: 'Ice, Skol Beats, Smirnoff Ice e drinks prontos', order: 10, isActive: true },
+];
+
+export const INITIAL_PRODUCTS: Product[] = [
+  {
+    id: 'prod-heineken',
+    storeId: 'adegatk',
+    categoryId: 'cat-cervejas',
+    name: 'Cerveja Heineken',
+    description: 'Puro malte refrescante com aroma marcante e lúpulo selecionado. Servida trincando de gelada.',
+    price: 7.99,
+    promoPrice: 6.99,
+    imageUrl: 'https://images.unsplash.com/photo-1618886614638-80e3c153d31a?w=600&auto=format&fit=crop&q=80',
+    inStock: true,
+    isActive: true,
+    isFeatured: true,
+    isBestSeller: true,
+    isPromo: true,
+    order: 1,
+    volumeOrWeight: '350ml',
+    variants: [
+      { id: 'v-h-lata', name: 'Lata 350ml', price: 6.99, promoPrice: 6.49 },
+      { id: 'v-h-long', name: 'Long Neck 330ml', price: 9.90, promoPrice: 8.90 },
+      { id: 'v-h-600', name: 'Garrafa 600ml', price: 15.90 },
+      { id: 'v-h-fardo', name: 'Pack c/ 12 Latas 350ml', price: 79.90, promoPrice: 74.90 }
+    ]
+  },
+  {
+    id: 'prod-corona',
+    storeId: 'adegatk',
+    categoryId: 'cat-cervejas',
+    name: 'Cerveja Corona Extra Long Neck',
+    description: 'A clássica cerveja mexicana premium, leve e refrescante. Acompanha fatia de limão.',
+    price: 10.50,
+    promoPrice: 8.99,
+    imageUrl: 'https://images.unsplash.com/photo-1584225064785-c62a8b43d148?w=600&auto=format&fit=crop&q=80',
+    inStock: true,
+    isActive: true,
+    isFeatured: true,
+    isBestSeller: true,
+    isPromo: true,
+    order: 2,
+    volumeOrWeight: '330ml',
+    variants: [
+      { id: 'v-cor-un', name: 'Unidade 330ml', price: 8.99 },
+      { id: 'v-cor-6pack', name: 'Pack c/ 6 unidades', price: 52.00, promoPrice: 49.90 }
+    ]
+  },
+  {
+    id: 'prod-spaten',
+    storeId: 'adegatk',
+    categoryId: 'cat-cervejas',
+    name: 'Cerveja Spaten Puro Malte',
+    description: 'Cerveja puro malte tradicional estilo Munich Helles da Alemanha desde 1397.',
+    price: 6.50,
+    promoPrice: 5.49,
+    imageUrl: 'https://images.unsplash.com/photo-1608270119842-e1c9446d3284?w=600&auto=format&fit=crop&q=80',
+    inStock: true,
+    isActive: true,
+    isFeatured: false,
+    isBestSeller: true,
+    isPromo: true,
+    order: 3,
+    volumeOrWeight: '350ml',
+    variants: [
+      { id: 'v-sp-lata', name: 'Lata 350ml', price: 5.49 },
+      { id: 'v-sp-long', name: 'Long Neck 355ml', price: 7.99 },
+      { id: 'v-sp-pack', name: 'Pack c/ 12 Latas', price: 62.90, promoPrice: 58.90 }
+    ]
+  },
+  {
+    id: 'prod-brahma-duplo',
+    storeId: 'adegatk',
+    categoryId: 'cat-cervejas',
+    name: 'Cerveja Brahma Duplo Malte',
+    description: 'A união do malte pilsner com o malte tostado resultando em sabor encorpado e espuma cremosa.',
+    price: 5.20,
+    promoPrice: 4.69,
+    imageUrl: 'https://images.unsplash.com/photo-1535958636474-b021ee887b13?w=600&auto=format&fit=crop&q=80',
+    inStock: true,
+    isActive: true,
+    isFeatured: false,
+    isBestSeller: false,
+    isPromo: true,
+    order: 4,
+    volumeOrWeight: '350ml'
+  },
+  {
+    id: 'prod-jack-daniels',
+    storeId: 'adegatk',
+    categoryId: 'cat-destilados',
+    name: "Whisky Jack Daniel's Old No. 7",
+    description: 'Tennessee Whiskey suavizado gota a gota em carvão de bordo açucareiro. Sabor clássico e inconfundível.',
+    price: 169.90,
+    promoPrice: 149.90,
+    imageUrl: 'https://images.unsplash.com/photo-1527281400683-1aae777175f8?w=600&auto=format&fit=crop&q=80',
+    inStock: true,
+    isActive: true,
+    isFeatured: true,
+    isBestSeller: true,
+    isPromo: true,
+    order: 5,
+    volumeOrWeight: '1 Litro',
+    variants: [
+      { id: 'v-jd-original', name: 'Garrafa 1 Litro Tradicional', price: 149.90 },
+      { id: 'v-jd-honey', name: 'Jack Daniel’s Honey 1 Litro', price: 159.90, promoPrice: 149.90 },
+      { id: 'v-jd-apple', name: 'Jack Daniel’s Apple 1 Litro', price: 159.90, promoPrice: 149.90 }
+    ]
+  },
+  {
+    id: 'prod-red-label',
+    storeId: 'adegatk',
+    categoryId: 'cat-destilados',
+    name: 'Whisky Johnnie Walker Red Label',
+    description: 'O whisky escocês pioneiro mais vendido do mundo. Notas vibrantes e toques de especiarias.',
+    price: 119.90,
+    promoPrice: 99.90,
+    imageUrl: 'https://images.unsplash.com/photo-1563227812-0ea4c22e6cc8?w=600&auto=format&fit=crop&q=80',
+    inStock: true,
+    isActive: true,
+    isFeatured: true,
+    isBestSeller: true,
+    isPromo: true,
+    order: 6,
+    volumeOrWeight: '1 Litro'
+  },
+  {
+    id: 'prod-tanqueray',
+    storeId: 'adegatk',
+    categoryId: 'cat-destilados',
+    name: 'Gin Tanqueray London Dry',
+    description: 'Quatro vezes destilado com zimbro maduro, sementes de coentro e angélica. Perfeito para seu Gin & Tônica.',
+    price: 139.90,
+    promoPrice: 119.90,
+    imageUrl: 'https://images.unsplash.com/photo-1514362545857-3bc16c4c7d1b?w=600&auto=format&fit=crop&q=80',
+    inStock: true,
+    isActive: true,
+    isFeatured: true,
+    isBestSeller: true,
+    isPromo: true,
+    order: 7,
+    volumeOrWeight: '750ml'
+  },
+  {
+    id: 'prod-smirnoff',
+    storeId: 'adegatk',
+    categoryId: 'cat-destilados',
+    name: 'Vodka Smirnoff No. 21',
+    description: 'Vodka triplamente destilada e dez vezes filtrada em carvão vegetal para máxima pureza.',
+    price: 49.90,
+    promoPrice: 42.90,
+    imageUrl: 'https://images.unsplash.com/photo-1550985543-f47f38aee6fe?w=600&auto=format&fit=crop&q=80',
+    inStock: true,
+    isActive: true,
+    isFeatured: false,
+    isBestSeller: true,
+    isPromo: true,
+    order: 8,
+    volumeOrWeight: '998ml'
+  },
+  {
+    id: 'prod-vinho-casillero',
+    storeId: 'adegatk',
+    categoryId: 'cat-vinhos',
+    name: 'Vinho Tinto Casillero del Diablo Cabernet Sauvignon',
+    description: 'Vinho chileno encorpado com notas de ameixa preta, café e baunilha tostada. Safra selecionada.',
+    price: 69.90,
+    promoPrice: 59.90,
+    imageUrl: 'https://images.unsplash.com/photo-1506377247377-2a5b3b417ebb?w=600&auto=format&fit=crop&q=80',
+    inStock: true,
+    isActive: true,
+    isFeatured: true,
+    isBestSeller: true,
+    isPromo: true,
+    order: 9,
+    volumeOrWeight: '750ml'
+  },
+  {
+    id: 'prod-espumante-chandon',
+    storeId: 'adegatk',
+    categoryId: 'cat-vinhos',
+    name: 'Espumante Chandon Réserve Brut',
+    description: 'Espumante nacional renomado, fresco, elegante e equilibrado. Já entregue na temperatura certa.',
+    price: 98.90,
+    promoPrice: 89.90,
+    imageUrl: 'https://images.unsplash.com/photo-1568213816046-0ee1c42bd559?w=600&auto=format&fit=crop&q=80',
+    inStock: true,
+    isActive: true,
+    isFeatured: false,
+    isBestSeller: false,
+    isPromo: false,
+    order: 10,
+    volumeOrWeight: '750ml'
+  },
+  {
+    id: 'prod-redbull',
+    storeId: 'adegatk',
+    categoryId: 'cat-energeticos',
+    name: 'Energético Red Bull Energy Drink',
+    description: 'Red Bull te dá asas. Vitaliza a mente e o corpo para curtir sem parar.',
+    price: 11.50,
+    promoPrice: 9.99,
+    imageUrl: 'https://images.unsplash.com/photo-1622543925917-763c34d1a86e?w=600&auto=format&fit=crop&q=80',
+    inStock: true,
+    isActive: true,
+    isFeatured: true,
+    isBestSeller: true,
+    isPromo: true,
+    order: 11,
+    volumeOrWeight: '250ml',
+    variants: [
+      { id: 'v-rb-trad', name: 'Tradicional 250ml', price: 9.99 },
+      { id: 'v-rb-sugarfree', name: 'Sugar Free 250ml', price: 9.99 },
+      { id: 'v-rb-tropical', name: 'Tropical 250ml', price: 9.99 },
+      { id: 'v-rb-melancia', name: 'Melancia 250ml', price: 9.99 }
+    ]
+  },
+  {
+    id: 'prod-coca-cola',
+    storeId: 'adegatk',
+    categoryId: 'cat-refrigerantes',
+    name: 'Refrigerante Coca-Cola Original',
+    description: 'Sabor clássico geladíssimo para acompanhar suas bebidas e refeições.',
+    price: 6.00,
+    promoPrice: 4.99,
+    imageUrl: 'https://images.unsplash.com/photo-1629203851122-3726ecdf080e?w=600&auto=format&fit=crop&q=80',
+    inStock: true,
+    isActive: true,
+    isFeatured: false,
+    isBestSeller: true,
+    isPromo: true,
+    order: 12,
+    volumeOrWeight: '350ml',
+    variants: [
+      { id: 'v-coca-lata', name: 'Lata 350ml', price: 4.99 },
+      { id: 'v-coca-zero-lata', name: 'Lata 350ml Sem Açúcar', price: 4.99 },
+      { id: 'v-coca-2l', name: 'Garrafa Pet 2 Litros', price: 12.90, promoPrice: 11.50 }
+    ]
+  },
+  {
+    id: 'prod-gelo-saco',
+    storeId: 'adegatk',
+    categoryId: 'cat-gelo',
+    name: 'Saco de Gelo Filtrado em Cubos 5kg',
+    description: 'Gelo puro e cristalino produzido com água filtrada para gelar bebidas rapidamente.',
+    price: 15.00,
+    promoPrice: 13.00,
+    imageUrl: 'https://images.unsplash.com/photo-1563245372-f21724e3856d?w=600&auto=format&fit=crop&q=80',
+    inStock: true,
+    isActive: true,
+    isFeatured: false,
+    isBestSeller: true,
+    isPromo: true,
+    order: 13,
+    volumeOrWeight: '5 Kg'
+  },
+  {
+    id: 'prod-gelo-coco',
+    storeId: 'adegatk',
+    categoryId: 'cat-gelo',
+    name: 'Gelo de Coco Saborizado 200ml',
+    description: 'O parceiro ideal do whisky e do gin. Dá cremosidade e sabor tropical.',
+    price: 5.00,
+    promoPrice: 4.00,
+    imageUrl: 'https://images.unsplash.com/photo-1544025162-d76694265947?w=600&auto=format&fit=crop&q=80',
+    inStock: true,
+    isActive: true,
+    isFeatured: false,
+    isBestSeller: true,
+    isPromo: false,
+    order: 14,
+    volumeOrWeight: '200ml'
+  },
+  {
+    id: 'prod-doritos',
+    storeId: 'adegatk',
+    categoryId: 'cat-petiscos',
+    name: 'Salgadinho Doritos Queijo Nacho',
+    description: 'Tortilha de milho crocante com o autêntico e irresistível sabor de queijo nacho.',
+    price: 14.50,
+    promoPrice: 12.90,
+    imageUrl: 'https://images.unsplash.com/photo-1566478989037-eec170784d0b?w=600&auto=format&fit=crop&q=80',
+    inStock: true,
+    isActive: true,
+    isFeatured: false,
+    isBestSeller: false,
+    isPromo: false,
+    order: 15,
+    volumeOrWeight: '140g'
+  },
+  {
+    id: 'prod-skol-beats',
+    storeId: 'adegatk',
+    categoryId: 'cat-outras',
+    name: 'Skol Beats Senses Long Neck',
+    description: 'Bebida alcoólica mista refrescante e aromática, perfeita para balada ou esquenta.',
+    price: 9.90,
+    promoPrice: 8.50,
+    imageUrl: 'https://images.unsplash.com/photo-1551024709-8f23befc6f87?w=600&auto=format&fit=crop&q=80',
+    inStock: true,
+    isActive: true,
+    isFeatured: false,
+    isBestSeller: true,
+    isPromo: true,
+    order: 16,
+    volumeOrWeight: '269ml'
+  }
+];
+
+export const INITIAL_COMBOS: Combo[] = [
+  {
+    id: 'combo-fds-jack',
+    storeId: 'adegatk',
+    name: 'Combo Sextou Jack Daniel’s',
+    description: 'O combo supremo para a resenha de respeito. Tudo que você precisa para curtir a noite toda.',
+    includedItems: [
+      '1x Whisky Jack Daniel’s Old No. 7 1L',
+      '4x Energéticos Red Bull 250ml',
+      '2x Gelo de Coco 200ml',
+      '1x Saco de Gelo em Cubo 5kg',
+      '4x Copos descartáveis 500ml de brinde'
+    ],
+    originalPrice: 229.90,
+    promoPrice: 199.90,
+    imageUrl: 'https://images.unsplash.com/photo-1527281400683-1aae777175f8?w=800&auto=format&fit=crop&q=80',
+    isActive: true,
+    isFeatured: true
+  },
+  {
+    id: 'combo-tanqueray-tropical',
+    storeId: 'adegatk',
+    name: 'Combo Gin Tanqueray Tropical',
+    description: 'Refrescância máxima e elegância no seu copo com frutas e especiarias.',
+    includedItems: [
+      '1x Gin Tanqueray London Dry 750ml',
+      '5x Águas Tônicas Antarctica 350ml',
+      '1x Sachê de Especiarias para Gin',
+      '1x Saco de Gelo em Cubos 5kg'
+    ],
+    originalPrice: 189.90,
+    promoPrice: 159.90,
+    imageUrl: 'https://images.unsplash.com/photo-1514362545857-3bc16c4c7d1b?w=800&auto=format&fit=crop&q=80',
+    isActive: true,
+    isFeatured: true
+  },
+  {
+    id: 'combo-churras-cerveja',
+    storeId: 'adegatk',
+    name: 'Combo Resenha & Churrasco Heineken',
+    description: 'Cerveja geladaça garantida para o encontro com os amigos.',
+    includedItems: [
+      '24x Cervejas Heineken Lata 350ml trincando',
+      '2x Sacos de Gelo 5kg',
+      '1x Pacote de Carvão Vegetal 3kg'
+    ],
+    originalPrice: 185.00,
+    promoPrice: 165.00,
+    imageUrl: 'https://images.unsplash.com/photo-1618886614638-80e3c153d31a?w=800&auto=format&fit=crop&q=80',
+    isActive: true,
+    isFeatured: true
+  },
+  {
+    id: 'combo-vodka-energetico',
+    storeId: 'adegatk',
+    name: 'Combo Esquenta Smirnoff',
+    description: 'O clássico custo-benefício que não pode faltar em nenhuma comemoração.',
+    includedItems: [
+      '1x Vodka Smirnoff 998ml',
+      '4x Energéticos Red Bull Tradicional',
+      '1x Saco de Gelo 5kg'
+    ],
+    originalPrice: 110.00,
+    promoPrice: 89.90,
+    imageUrl: 'https://images.unsplash.com/photo-1550985543-f47f38aee6fe?w=800&auto=format&fit=crop&q=80',
+    isActive: true,
+    isFeatured: false
+  }
+];
+
+export const INITIAL_DELIVERY_ZONES: DeliveryZone[] = [
+  { id: 'zone-1', storeId: 'adegatk', neighborhood: 'Vila Nova (Próximo à loja)', fee: 5.0, estimatedTime: '20 - 35 min', isActive: true },
+  { id: 'zone-2', storeId: 'adegatk', neighborhood: 'Centro e Jardins', fee: 8.0, estimatedTime: '30 - 45 min', isActive: true },
+  { id: 'zone-3', storeId: 'adegatk', neighborhood: 'Bela Vista & Consolação', fee: 10.0, estimatedTime: '35 - 50 min', isActive: true },
+  { id: 'zone-4', storeId: 'adegatk', neighborhood: 'Pinheiros & Vila Madalena', fee: 12.0, estimatedTime: '40 - 55 min', isActive: true },
+  { id: 'zone-5', storeId: 'adegatk', neighborhood: 'Moema & Itaim Bibi', fee: 14.0, estimatedTime: '45 - 60 min', isActive: true },
+];
+
+export const INITIAL_USERS: AdminUser[] = [
+  {
+    id: 'user-admin',
+    name: 'TK Administrador',
+    email: 'tkadega85@gmail.com',
+    role: 'admin',
+    storeId: 'adegatk',
+    isActive: true,
+    avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80'
+  },
+  {
+    id: 'user-gerente',
+    name: 'Carlos Oliveira (Gerente)',
+    email: 'gerente@adegatk.com.br',
+    role: 'gerente',
+    storeId: 'adegatk',
+    isActive: true
+  },
+  {
+    id: 'user-atendente',
+    name: 'Juliana Silva (Atendente)',
+    email: 'atendente@adegatk.com.br',
+    role: 'atendente',
+    storeId: 'adegatk',
+    isActive: true
+  }
+];
+
+export const INITIAL_ORDERS: Order[] = [
+  {
+    id: 'ord-1024',
+    orderNumber: 1024,
+    storeId: 'adegatk',
+    customerName: 'Lucas Ferreira',
+    customerPhone: '(11) 99123-4567',
+    deliveryType: 'delivery',
+    address: {
+      street: 'Rua Augusta',
+      number: '1240',
+      complement: 'Apto 42',
+      neighborhood: 'Consolação',
+      reference: 'Próximo ao metrô'
+    },
+    paymentMethod: 'pix',
+    items: [
+      {
+        productId: 'prod-jack-daniels',
+        productName: "Whisky Jack Daniel's Old No. 7 1L",
+        quantity: 1,
+        unitPrice: 149.90,
+        totalPrice: 149.90,
+      },
+      {
+        productId: 'prod-heineken',
+        productName: 'Cerveja Heineken Lata 350ml',
+        quantity: 6,
+        unitPrice: 6.49,
+        totalPrice: 38.94,
+      },
+      {
+        productId: 'prod-gelo-saco',
+        productName: 'Saco de Gelo em Cubos 5kg',
+        quantity: 1,
+        unitPrice: 13.00,
+        totalPrice: 13.00,
+      }
+    ],
+    subtotal: 201.84,
+    deliveryFee: 10.0,
+    discount: 0,
+    total: 211.84,
+    status: 'novo',
+    customerNotes: 'Por favor mandar cerveja bem gelada! Valeu!',
+    createdAt: new Date(Date.now() - 1000 * 60 * 12).toISOString(),
+  },
+  {
+    id: 'ord-1023',
+    orderNumber: 1023,
+    storeId: 'adegatk',
+    customerName: 'Mariana Costa',
+    customerPhone: '(11) 98765-1122',
+    deliveryType: 'delivery',
+    address: {
+      street: 'Alameda Santos',
+      number: '800',
+      complement: 'Bloco B, 1102',
+      neighborhood: 'Jardins',
+    },
+    paymentMethod: 'cartao_credito',
+    items: [
+      {
+        productId: 'combo-tanqueray-tropical',
+        productName: 'Combo Gin Tanqueray Tropical',
+        quantity: 1,
+        unitPrice: 159.90,
+        totalPrice: 159.90,
+      }
+    ],
+    subtotal: 159.90,
+    deliveryFee: 0, // Free delivery because > 150
+    discount: 0,
+    total: 159.90,
+    status: 'preparando',
+    createdAt: new Date(Date.now() - 1000 * 60 * 35).toISOString(),
+  },
+  {
+    id: 'ord-1022',
+    orderNumber: 1022,
+    storeId: 'adegatk',
+    customerName: 'Rodrigo Alves',
+    customerPhone: '(11) 97654-3210',
+    deliveryType: 'retirada',
+    paymentMethod: 'dinheiro',
+    changeFor: 100.0,
+    items: [
+      {
+        productId: 'prod-heineken',
+        productName: 'Cerveja Heineken Pack c/ 12 Latas',
+        quantity: 1,
+        unitPrice: 74.90,
+        totalPrice: 74.90,
+      }
+    ],
+    subtotal: 74.90,
+    deliveryFee: 0,
+    discount: 0,
+    total: 74.90,
+    status: 'saiu_entrega',
+    createdAt: new Date(Date.now() - 1000 * 60 * 65).toISOString(),
+  },
+  {
+    id: 'ord-1021',
+    orderNumber: 1021,
+    storeId: 'adegatk',
+    customerName: 'Beatriz Lima',
+    customerPhone: '(11) 98111-2233',
+    deliveryType: 'delivery',
+    address: {
+      street: 'Rua Bela Cintra',
+      number: '450',
+      neighborhood: 'Consolação'
+    },
+    paymentMethod: 'pix',
+    items: [
+      {
+        productId: 'prod-vinho-casillero',
+        productName: 'Vinho Tinto Casillero del Diablo',
+        quantity: 2,
+        unitPrice: 59.90,
+        totalPrice: 119.80,
+      }
+    ],
+    subtotal: 119.80,
+    deliveryFee: 8.0,
+    discount: 0,
+    total: 127.80,
+    status: 'entregue',
+    createdAt: new Date(Date.now() - 1000 * 60 * 180).toISOString(),
+  }
+];
