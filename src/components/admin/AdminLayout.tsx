@@ -18,8 +18,7 @@ import {
   Bell,
   ExternalLink,
   Menu,
-  X,
-  RotateCcw
+  X
 } from 'lucide-react';
 import { DashboardView } from './DashboardView';
 import { ProductsManager } from './ProductsManager';
@@ -43,7 +42,6 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ onBackToStore }) => {
     logout,
     store,
     pendingOrdersCount,
-    resetToDefaults,
   } = useStore();
 
   const [activeTab, setActiveTab] = useState<string>('dashboard');
@@ -218,20 +216,6 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ onBackToStore }) => {
           >
             <ExternalLink className="w-4 h-4 text-amber-500" />
             <span className="font-semibold">Ver Cardápio Público</span>
-          </button>
-
-          {/* Reset Demo Data button */}
-          <button
-            onClick={() => {
-              if (confirm('Restaurar dados de demonstração originais da AdegaTK?')) {
-                resetToDefaults();
-              }
-            }}
-            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 transition-colors cursor-pointer"
-            title="Restaura produtos, fotos e pedidos iniciais caso queira resetar"
-          >
-            <RotateCcw className="w-4 h-4" />
-            <span>Restaurar Demo</span>
           </button>
 
           {/* Logout */}

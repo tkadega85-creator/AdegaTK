@@ -26,12 +26,12 @@ export const CombosManager: React.FC = () => {
     setEditingCombo(null);
     setName('');
     setDescription('');
-    setOriginalPrice('199.90');
-    setPromoPrice('169.90');
-    setImageUrl('https://images.unsplash.com/photo-1527281400683-1aae777175f8?w=800&auto=format&fit=crop&q=80');
+    setOriginalPrice('');
+    setPromoPrice('');
+    setImageUrl('');
     setIsActive(true);
     setIsFeatured(true);
-    setIncludedItems(['1x Garrafa Whisky 1L', '4x Energéticos 250ml', '1x Gelo 5kg']);
+    setIncludedItems([]);
     setIsModalOpen(true);
   };
 
@@ -41,7 +41,7 @@ export const CombosManager: React.FC = () => {
     setDescription(combo.description);
     setOriginalPrice(combo.originalPrice.toString());
     setPromoPrice(combo.promoPrice.toString());
-    setImageUrl(combo.imageUrl);
+    setImageUrl(combo.imageUrl || '');
     setIsActive(combo.isActive);
     setIsFeatured(combo.isFeatured || false);
     setIncludedItems([...combo.includedItems]);
@@ -65,8 +65,8 @@ export const CombosManager: React.FC = () => {
       description: description.trim(),
       originalPrice: parseFloat(originalPrice.replace(',', '.')) || 0,
       promoPrice: parseFloat(promoPrice.replace(',', '.')) || 0,
-      imageUrl: imageUrl.trim() || 'https://images.unsplash.com/photo-1527281400683-1aae777175f8?w=800&auto=format&fit=crop&q=80',
-      includedItems: includedItems.length > 0 ? includedItems : ['1x Combo Especial'],
+      imageUrl: imageUrl.trim(),
+      includedItems: includedItems,
       isActive,
       isFeatured,
     };

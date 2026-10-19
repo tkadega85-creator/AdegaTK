@@ -27,7 +27,11 @@ export const Header: React.FC<HeaderProps> = ({
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-3">
           <div className="flex items-center gap-2 truncate">
             <MapPin className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-            <span className="truncate">{store.address}, {store.neighborhood} • {store.city}</span>
+            <span className="truncate">
+              {store.address
+                ? `${store.address}${store.neighborhood ? `, ${store.neighborhood}` : ''}${store.city ? ` • ${store.city}` : ''}`
+                : 'Atendimento & Delivery'}
+            </span>
           </div>
 
           <div className="flex items-center gap-3 shrink-0">
@@ -81,17 +85,23 @@ export const Header: React.FC<HeaderProps> = ({
         {/* Brand identity */}
         <div className="flex items-center gap-3">
           <div className="relative">
-            <img
-              src={store.appearance.logoUrl}
-              alt={store.name}
-              className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl object-cover border border-amber-500/30 shadow-md shadow-amber-500/10"
-            />
+            {store.appearance.logoUrl ? (
+              <img
+                src={store.appearance.logoUrl}
+                alt={store.name}
+                className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl object-cover border border-amber-500/30 shadow-md shadow-amber-500/10"
+              />
+            ) : (
+              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-slate-900 border border-amber-500/30 flex items-center justify-center font-black text-amber-400 text-lg shadow-md shadow-amber-500/10">
+                {store.name ? store.name.substring(0, 2).toUpperCase() : 'TK'}
+              </div>
+            )}
             <span className="absolute -bottom-1 -right-1 text-sm bg-slate-900 rounded-full border border-slate-750 px-0.5">🍾</span>
           </div>
           <div>
             <div className="flex items-center gap-2">
               <span className="font-black text-xl sm:text-2xl tracking-tight text-white flex items-center">
-                Adega<span className="text-amber-500">TK</span>
+                {store.name || 'Adega'}
               </span>
               <span className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 bg-amber-500/20 text-amber-300 rounded border border-amber-500/30">
                 Delivery
@@ -111,7 +121,7 @@ export const Header: React.FC<HeaderProps> = ({
               type="text"
               value={searchQuery}
               onChange={(e) => onSearchChange(e.target.value)}
-              placeholder="O que você quer beber hoje? (ex: Heineken, Jack...)"
+              placeholder="O que você está procurando? (cerveja, vinho, whisky...)"
               className="w-full bg-slate-900/90 border border-slate-800 rounded-full pl-10 pr-4 py-2 text-sm text-slate-100 placeholder-slate-400 focus:outline-none focus:border-amber-500/80 focus:ring-1 focus:ring-amber-500/40 transition-all"
             />
             {searchQuery && (
@@ -128,16 +138,27 @@ export const Header: React.FC<HeaderProps> = ({
         {/* Right Action buttons */}
         <div className="flex items-center gap-2 sm:gap-3">
           {/* WhatsApp Direct */}
-          <a
-            href={`https://wa.me/${cleanPhone}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/40 text-emerald-400 text-xs sm:text-sm font-semibold transition-all hover:scale-[1.02] active:scale-[0.98]"
-            title="Falar no WhatsApp"
-          >
-            <Phone className="w-4 h-4 text-emerald-400 shrink-0" />
-            <span className="hidden sm:inline">WhatsApp</span>
-          </a>
+          {cleanPhone ? (
+            <a
+              href={`https://wa.me/${cleanPhone}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/40 text-emerald-400 text-xs sm:text-sm font-semibold transition-all hover:scale-[1.02] active:scale-[0.98]"
+              title="Falar no WhatsApp"
+            >
+              <Phone className="w-4 h-4 text-emerald-400 shrink-0" />
+              <span className="hidden sm:inline">WhatsApp</span>
+            </a>
+          ) : (
+            <button
+              onClick={onOpenAdminLogin}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-750 border border-slate-700 text-slate-400 text-xs sm:text-sm font-semibold transition-all cursor-pointer"
+              title="WhatsApp comercial não configurado. Clique para acessar o painel administrativo."
+            >
+              <Phone className="w-4 h-4 text-slate-400 shrink-0" />
+              <span className="hidden sm:inline">WhatsApp</span>
+            </button>
+          )}
 
           {/* Cart Button */}
           <button

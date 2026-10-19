@@ -4,7 +4,7 @@ import { AdminUser, Role } from '../../types';
 import { Users, Plus, Edit2, Trash2, Shield, UserCheck, KeyRound } from 'lucide-react';
 
 export const UsersManager: React.FC = () => {
-  const { adminUsers, addUser, updateUser, deleteUser, currentUser } = useStore();
+  const { adminUsers, addUser, updateUser, deleteUser, currentUser, changePassword } = useStore();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<AdminUser | null>(null);
@@ -12,13 +12,19 @@ export const UsersManager: React.FC = () => {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [role, setRole] = useState<Role>('atendente');
+  const [password, setPassword] = useState('');
   const [isActive, setIsActive] = useState(true);
+
+  // Self password change state
+  const [myNewPassword, setMyNewPassword] = useState('');
+  const [passwordFeedback, setPasswordFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   const handleOpenAdd = () => {
     setEditingUser(null);
     setName('');
     setEmail('');
     setRole('atendente');
+    setPassword('');
     setIsActive(true);
     setIsModalOpen(true);
   };
@@ -28,18 +34,22 @@ export const UsersManager: React.FC = () => {
     setName(user.name);
     setEmail(user.email);
     setRole(user.role);
+    setPassword('');
     setIsActive(user.isActive);
     setIsModalOpen(true);
   };
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
-    const payload = {
+    const payload: any = {
       name: name.trim(),
       email: email.trim().toLowerCase(),
       role,
       isActive,
     };
+    if (password.trim()) {
+      payload.password = password.trim();
+    }
 
     if (editingUser) {
       updateUser(editingUser.id, payload);
@@ -48,6 +58,22 @@ export const UsersManager: React.FC = () => {
     }
 
     setIsModalOpen(false);
+  };
+
+  const handleChangeMyPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!myNewPassword || myNewPassword.length < 4) {
+      setPasswordFeedback({ type: 'error', message: 'A senha deve ter no mínimo 4 caracteres.' });
+      return;
+    }
+    const res = await changePassword(myNewPassword);
+    if (res.success) {
+      setPasswordFeedback({ type: 'success', message: 'Sua senha foi alterada com sucesso!' });
+      setMyNewPassword('');
+      setTimeout(() => setPasswordFeedback(null), 3500);
+    } else {
+      setPasswordFeedback({ type: 'error', message: res.error || 'Erro ao alterar senha.' });
+    }
   };
 
   const roleLabels: Record<Role, { label: string; badge: string; desc: string }> = {
@@ -161,6 +187,46 @@ export const UsersManager: React.FC = () => {
         </div>
       </div>
 
+      {/* Alterar Minha Senha */}
+      <div className="bg-slate-900 border border-slate-800 p-5 sm:p-6 rounded-2xl space-y-4">
+        <div className="flex items-center gap-2">
+          <KeyRound className="w-5 h-5 text-amber-500" />
+          <div>
+            <h2 className="font-extrabold text-base text-white">Alterar Minha Senha de Acesso</h2>
+            <p className="text-xs text-slate-400">Atualize sua senha de administrador para maior segurança</p>
+          </div>
+        </div>
+
+        {passwordFeedback && (
+          <div
+            className={`p-3 rounded-xl text-xs font-semibold flex items-center gap-2 ${
+              passwordFeedback.type === 'success'
+                ? 'bg-emerald-950/50 text-emerald-300 border border-emerald-800/60'
+                : 'bg-rose-950/50 text-rose-300 border border-rose-800/60'
+            }`}
+          >
+            <span>{passwordFeedback.message}</span>
+          </div>
+        )}
+
+        <form onSubmit={handleChangeMyPassword} className="flex flex-col sm:flex-row gap-3 max-w-lg">
+          <input
+            type="password"
+            required
+            placeholder="Digite a nova senha (mínimo 4 caracteres)..."
+            value={myNewPassword}
+            onChange={(e) => setMyNewPassword(e.target.value)}
+            className="flex-1 bg-slate-950 border border-slate-800 focus:border-amber-500 rounded-xl px-3 py-2 text-xs sm:text-sm text-slate-100 placeholder-slate-500 focus:outline-none"
+          />
+          <button
+            type="submit"
+            className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs rounded-xl shadow-md transition-colors cursor-pointer shrink-0"
+          >
+            Atualizar Senha
+          </button>
+        </form>
+      </div>
+
       {/* Modal Add / Edit User */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md">
@@ -202,6 +268,20 @@ export const UsersManager: React.FC = () => {
                   placeholder="operador@adegatk.com.br"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 focus:border-amber-500 rounded-xl px-3 py-2 text-slate-100 placeholder-slate-500 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="font-bold text-slate-300 block mb-1">
+                  {editingUser ? 'Nova Senha (opcional, deixe em branco para não alterar)' : 'Senha Inicial *'}
+                </label>
+                <input
+                  type="password"
+                  required={!editingUser}
+                  placeholder={editingUser ? 'Manter senha atual' : 'Mínimo 4 caracteres'}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
                   className="w-full bg-slate-950 border border-slate-800 focus:border-amber-500 rounded-xl px-3 py-2 text-slate-100 placeholder-slate-500 focus:outline-none"
                 />
               </div>

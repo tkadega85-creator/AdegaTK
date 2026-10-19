@@ -24,18 +24,27 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
   const promoProducts = products.filter((p) => p.isPromo);
   const recentOrders = orders.slice(0, 5);
 
-  // Group orders for simulated sales chart
-  const days = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
-  const chartData = [
-    { day: 'Seg', val: 420 },
-    { day: 'Ter', val: 680 },
-    { day: 'Qua', val: 890 },
-    { day: 'Qui', val: 1420 },
-    { day: 'Sex', val: 2890 },
-    { day: 'Sáb', val: 3450 },
-    { day: 'Dom', val: 2150 },
-  ];
-  const maxVal = Math.max(...chartData.map((d) => d.val));
+  // Group real orders by day of week for the past 7 days
+  const dayNames = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+  const now = new Date();
+  
+  const last7Days = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date();
+    d.setDate(now.getDate() - (6 - i));
+    const dayStr = d.toISOString().split('T')[0];
+    const dayLabel = dayNames[d.getDay()];
+    return { dateStr: dayStr, label: dayLabel };
+  });
+
+  const chartData = last7Days.map(({ dateStr, label }) => {
+    const dayRevenue = orders
+      .filter((o) => o.status !== 'cancelado' && o.createdAt && o.createdAt.startsWith(dateStr))
+      .reduce((sum, o) => sum + o.total, 0);
+    return { day: label, val: dayRevenue };
+  });
+
+  const weeklyRevenue = chartData.reduce((acc, c) => acc + c.val, 0);
+  const maxVal = Math.max(...chartData.map((d) => d.val), 10);
 
   const statusColors = {
     novo: 'bg-amber-500/20 text-amber-300 border-amber-500/40',
@@ -98,7 +107,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
           </div>
           <p className="text-[11px] text-emerald-400 flex items-center gap-1 font-semibold">
             <TrendingUp className="w-3 h-3" />
-            +18.4% vs semana anterior
+            Total acumulado de pedidos
           </p>
         </div>
 
@@ -160,10 +169,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
               <h3 className="font-extrabold text-sm sm:text-base text-white">
                 Faturamento Semanal (R$)
               </h3>
-              <p className="text-xs text-slate-400">Picos nos fins de semana e esquentas</p>
+              <p className="text-xs text-slate-400">Vendas dos últimos 7 dias</p>
             </div>
             <span className="text-xs text-amber-400 font-bold bg-amber-500/10 px-2 py-1 rounded-lg border border-amber-500/20">
-              Total Semana: R$ 11.480,00
+              Total Semana: R$ {weeklyRevenue.toFixed(2).replace('.', ',')}
             </span>
           </div>
 

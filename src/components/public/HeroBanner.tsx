@@ -19,11 +19,15 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({
     <div className="relative overflow-hidden bg-slate-950 border-b border-slate-800/60">
       {/* Background with dark overlay & subtle atmospheric glow */}
       <div className="absolute inset-0 z-0">
-        <img
-          src={store.appearance.bannerUrl}
-          alt={store.name}
-          className="w-full h-full object-cover object-center opacity-30 filter brightness-75 scale-105"
-        />
+        {store.appearance.bannerUrl ? (
+          <img
+            src={store.appearance.bannerUrl}
+            alt={store.name}
+            className="w-full h-full object-cover object-center opacity-30 filter brightness-75 scale-105"
+          />
+        ) : (
+          <div className="w-full h-full bg-gradient-to-br from-slate-900 via-slate-950 to-amber-950/20" />
+        )}
         <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/85 to-slate-950/60" />
         <div className="absolute top-0 right-1/4 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
       </div>
@@ -32,19 +36,23 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({
         {/* Brand pill */}
         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-semibold mb-4 backdrop-blur-sm">
           <Flame className="w-3.5 h-3.5 text-amber-500" />
-          <span>Distribuidora Oficial & Delivery 24h</span>
+          <span>{store.name || 'Adega'} • Delivery Oficial</span>
         </div>
 
         {/* Title & Slogan */}
         <h1 className="text-3xl sm:text-5xl md:text-6xl font-black text-white tracking-tight max-w-3xl leading-[1.1]">
-          {store.name}
+          {store.name || 'Adega'}
         </h1>
-        <p className="mt-3 text-lg sm:text-2xl font-bold bg-gradient-to-r from-amber-200 via-amber-400 to-amber-500 bg-clip-text text-transparent">
-          {store.slogan}
-        </p>
-        <p className="mt-2 text-xs sm:text-sm text-slate-300 max-w-xl">
-          {store.description}
-        </p>
+        {store.slogan && (
+          <p className="mt-3 text-lg sm:text-2xl font-bold bg-gradient-to-r from-amber-200 via-amber-400 to-amber-500 bg-clip-text text-transparent">
+            {store.slogan}
+          </p>
+        )}
+        {store.description && (
+          <p className="mt-2 text-xs sm:text-sm text-slate-300 max-w-xl">
+            {store.description}
+          </p>
+        )}
 
         {/* Feature Badges */}
         <div className="mt-6 flex flex-wrap items-center justify-center gap-2 sm:gap-4 text-xs font-medium text-slate-300">

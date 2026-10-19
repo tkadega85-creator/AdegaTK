@@ -8,6 +8,7 @@ export interface AdminUser {
   storeId: string;
   isActive: boolean;
   avatarUrl?: string;
+  passwordHash?: string;
 }
 
 export interface StoreAppearance {
@@ -62,6 +63,7 @@ export interface Product {
   promoPrice?: number | null;
   imageUrl: string;
   inStock: boolean;
+  stockQuantity?: number;
   isActive: boolean;
   isFeatured: boolean;
   isBestSeller: boolean;

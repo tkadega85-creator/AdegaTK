@@ -35,10 +35,11 @@ export const ProductsManager: React.FC = () => {
   const [name, setName] = useState('');
   const [categoryId, setCategoryId] = useState(categories[0]?.id || '');
   const [description, setDescription] = useState('');
-  const [price, setPrice] = useState('10.00');
+  const [price, setPrice] = useState('');
   const [promoPrice, setPromoPrice] = useState('');
   const [imageUrl, setImageUrl] = useState('');
   const [volumeOrWeight, setVolumeOrWeight] = useState('');
+  const [stockQuantity, setStockQuantity] = useState('');
   const [inStock, setInStock] = useState(true);
   const [isActive, setIsActive] = useState(true);
   const [isFeatured, setIsFeatured] = useState(false);
@@ -64,10 +65,11 @@ export const ProductsManager: React.FC = () => {
     setName('');
     setCategoryId(categories[0]?.id || '');
     setDescription('');
-    setPrice('10.00');
+    setPrice('');
     setPromoPrice('');
-    setImageUrl('https://images.unsplash.com/photo-1510812431401-41d2bd2722f3?w=600&auto=format&fit=crop&q=80');
-    setVolumeOrWeight('350ml');
+    setImageUrl('');
+    setVolumeOrWeight('');
+    setStockQuantity('');
     setInStock(true);
     setIsActive(true);
     setIsFeatured(false);
@@ -84,8 +86,9 @@ export const ProductsManager: React.FC = () => {
     setDescription(prod.description);
     setPrice(prod.price.toString());
     setPromoPrice(prod.promoPrice ? prod.promoPrice.toString() : '');
-    setImageUrl(prod.imageUrl);
+    setImageUrl(prod.imageUrl || '');
     setVolumeOrWeight(prod.volumeOrWeight || '');
+    setStockQuantity(prod.stockQuantity !== undefined ? prod.stockQuantity.toString() : '');
     setInStock(prod.inStock);
     setIsActive(prod.isActive);
     setIsFeatured(prod.isFeatured);
@@ -117,6 +120,7 @@ export const ProductsManager: React.FC = () => {
     e.preventDefault();
     const parsedPrice = parseFloat(price.replace(',', '.')) || 0;
     const parsedPromo = promoPrice.trim() ? parseFloat(promoPrice.replace(',', '.')) : null;
+    const parsedStock = stockQuantity.trim() ? parseInt(stockQuantity.trim(), 10) : undefined;
 
     const payload = {
       name: name.trim(),
@@ -124,9 +128,10 @@ export const ProductsManager: React.FC = () => {
       description: description.trim(),
       price: parsedPrice,
       promoPrice: parsedPromo,
-      imageUrl: imageUrl.trim() || 'https://images.unsplash.com/photo-1510812431401-41d2bd2722f3?w=600&auto=format&fit=crop&q=80',
+      imageUrl: imageUrl.trim(),
       volumeOrWeight: volumeOrWeight.trim(),
-      inStock,
+      stockQuantity: parsedStock !== undefined && !isNaN(parsedStock) ? Math.max(0, parsedStock) : undefined,
+      inStock: inStock && (parsedStock === undefined || parsedStock > 0),
       isActive,
       isFeatured,
       isBestSeller,
@@ -221,11 +226,20 @@ export const ProductsManager: React.FC = () => {
                   return (
                     <tr key={prod.id} className="hover:bg-slate-850/40 transition-colors">
                       <td className="p-3.5">
-                        <img
-                          src={prod.imageUrl}
-                          alt={prod.name}
-                          className="w-12 h-12 rounded-xl object-cover border border-slate-800 bg-slate-950 shrink-0"
-                        />
+                        {prod.imageUrl ? (
+                          <img
+                            src={prod.imageUrl}
+                            alt={prod.name}
+                            className="w-12 h-12 rounded-xl object-cover border border-slate-800 bg-slate-950 shrink-0"
+                            onError={(e) => {
+                              (e.target as HTMLElement).style.display = 'none';
+                            }}
+                          />
+                        ) : (
+                          <div className="w-12 h-12 rounded-xl border border-slate-800 bg-slate-950 flex items-center justify-center text-xl shrink-0">
+                            🍾
+                          </div>
+                        )}
                       </td>
                       <td className="p-3.5">
                         <div className="font-bold text-white text-sm">{prod.name}</div>
@@ -274,16 +288,23 @@ export const ProductsManager: React.FC = () => {
                         </div>
                       </td>
                       <td className="p-3.5">
-                        <button
-                          onClick={() => updateProduct(prod.id, { inStock: !prod.inStock })}
-                          className={`px-2 py-1 rounded-md text-[10px] font-bold transition-colors cursor-pointer ${
-                            prod.inStock
-                              ? 'bg-emerald-950/40 text-emerald-400 border border-emerald-800/50'
-                              : 'bg-rose-950/40 text-rose-400 border border-rose-800/50'
-                          }`}
-                        >
-                          {prod.inStock ? 'Em Estoque' : 'Esgotado'}
-                        </button>
+                        <div className="flex flex-col gap-1 items-start">
+                          <button
+                            onClick={() => updateProduct(prod.id, { inStock: !prod.inStock })}
+                            className={`px-2 py-1 rounded-md text-[10px] font-bold transition-colors cursor-pointer ${
+                              prod.inStock
+                                ? 'bg-emerald-950/40 text-emerald-400 border border-emerald-800/50'
+                                : 'bg-rose-950/40 text-rose-400 border border-rose-800/50'
+                            }`}
+                          >
+                            {prod.inStock ? 'Em Estoque' : 'Esgotado'}
+                          </button>
+                          {typeof prod.stockQuantity === 'number' && (
+                            <span className="text-[10px] text-slate-400 font-mono">
+                              {prod.stockQuantity} un.
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="p-3.5">
                         <button
@@ -400,8 +421,8 @@ export const ProductsManager: React.FC = () => {
                 />
               </div>
 
-              {/* Price, Promo Price, Volume */}
-              <div className="grid grid-cols-3 gap-3">
+              {/* Price, Promo Price, Volume & Stock */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <div>
                   <label className="text-xs text-slate-400 font-semibold block mb-1">
                     Preço Normal (R$) *
@@ -417,7 +438,7 @@ export const ProductsManager: React.FC = () => {
                 </div>
                 <div>
                   <label className="text-xs text-rose-400 font-semibold block mb-1">
-                    Preço Promocional (R$)
+                    Preço Promo (R$)
                   </label>
                   <input
                     type="text"
@@ -433,10 +454,23 @@ export const ProductsManager: React.FC = () => {
                   </label>
                   <input
                     type="text"
-                    placeholder="Ex: 1L, 350ml, 5kg"
+                    placeholder="Ex: 1L, 350ml"
                     value={volumeOrWeight}
                     onChange={(e) => setVolumeOrWeight(e.target.value)}
                     className="w-full bg-slate-950/80 border border-slate-800 focus:border-amber-500 rounded-xl px-3 py-2 text-xs sm:text-sm text-slate-100 placeholder-slate-500 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-emerald-400 font-semibold block mb-1">
+                    Estoque (Unidades)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    placeholder="Ex: 50"
+                    value={stockQuantity}
+                    onChange={(e) => setStockQuantity(e.target.value)}
+                    className="w-full bg-slate-950/80 border border-slate-800 focus:border-emerald-500 rounded-xl px-3 py-2 text-xs sm:text-sm text-emerald-300 placeholder-slate-600 focus:outline-none"
                   />
                 </div>
               </div>

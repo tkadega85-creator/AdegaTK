@@ -13,27 +13,30 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
   onClose,
   onSuccess,
 }) => {
-  const { login, adminUsers } = useStore();
+  const { login } = useStore();
   const [email, setEmail] = useState('tkadega85@gmail.com');
-  const [password, setPassword] = useState('admin');
+  const [password, setPassword] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    const ok = login(email, password);
-    if (ok) {
-      onSuccess();
-    } else {
-      setError('E-mail ou senha incorretos. Tente senha "admin" ou "adegatk".');
+    setIsLoading(true);
+    try {
+      const res = await login(email, password);
+      if (res.success) {
+        onSuccess();
+      } else {
+        setError(res.error || 'E-mail ou senha incorretos.');
+      }
+    } catch {
+      setError('Erro ao autenticar. Verifique sua conexão e tente novamente.');
+    } finally {
+      setIsLoading(false);
     }
-  };
-
-  const handleQuickLogin = (userEmail: string) => {
-    setEmail(userEmail);
-    setPassword('admin');
   };
 
   return (
@@ -53,7 +56,7 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
           </div>
           <h2 className="text-xl font-black text-white">Painel Administrativo</h2>
           <p className="text-xs text-slate-400">
-            Acesso restrito para gerenciamento da adega e pedidos
+            Acesso seguro para gerenciamento da adega e pedidos
           </p>
         </div>
 
@@ -85,7 +88,7 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
 
           <div>
             <label className="text-xs text-slate-300 font-semibold block mb-1">
-              Senha
+              Senha de Acesso
             </label>
             <div className="relative">
               <KeyRound className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -94,7 +97,7 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
+                placeholder="Digite sua senha..."
                 className="w-full bg-slate-950/80 border border-slate-800 focus:border-amber-500 rounded-xl pl-9 pr-3 py-2.5 text-xs sm:text-sm text-slate-100 placeholder-slate-500 focus:outline-none"
               />
             </div>
@@ -102,37 +105,13 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
 
           <button
             type="submit"
-            className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-sm rounded-xl shadow-lg shadow-amber-500/20 transition-all hover:scale-[1.01] active:scale-[0.99] cursor-pointer"
+            disabled={isLoading}
+            className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-slate-950 font-black text-sm rounded-xl shadow-lg shadow-amber-500/20 transition-all hover:scale-[1.01] active:scale-[0.99] cursor-pointer"
           >
-            <span>Entrar no Painel</span>
+            <span>{isLoading ? 'Autenticando...' : 'Entrar no Painel'}</span>
             <ArrowRight className="w-4 h-4" />
           </button>
         </form>
-
-        {/* Demo Fast Login Helper */}
-        <div className="pt-3 border-t border-slate-800 space-y-2">
-          <p className="text-[11px] text-slate-400 text-center font-medium">
-            Acesso Rápido para Demonstração (Clique para preencher):
-          </p>
-          <div className="grid grid-cols-1 gap-1.5 text-xs">
-            {adminUsers.map((u) => (
-              <button
-                key={u.id}
-                type="button"
-                onClick={() => handleQuickLogin(u.email)}
-                className="p-2 bg-slate-950/60 hover:bg-slate-800/80 border border-slate-800 rounded-xl flex items-center justify-between text-left transition-colors cursor-pointer text-slate-300"
-              >
-                <div>
-                  <span className="font-bold text-white">{u.name}</span>
-                  <span className="text-[10px] text-slate-400 block">{u.email}</span>
-                </div>
-                <span className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-slate-800 text-amber-400">
-                  {u.role}
-                </span>
-              </button>
-            ))}
-          </div>
-        </div>
       </div>
     </div>
   );

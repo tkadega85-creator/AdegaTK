@@ -75,7 +75,9 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     setTimeout(() => setPixCopied(false), 2500);
   };
 
-  const handleSubmitOrder = (e: React.FormEvent) => {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSubmitOrder = async (e: React.FormEvent) => {
     e.preventDefault();
     setValidationError('');
 
@@ -113,24 +115,27 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
       }
     }
 
-    // Create the order in the system
-    const newOrder = createOrder({
-      customerName: customerName.trim(),
-      customerPhone: customerPhone.trim(),
-      deliveryType,
-      address: addressObj,
-      paymentMethod,
-      changeFor: parsedChangeFor,
-      customerNotes: customerNotes.trim(),
-      deliveryFee,
-    });
+    setIsSubmitting(true);
+    try {
+      // Create the order in the system
+      const newOrder = await createOrder({
+        customerName: customerName.trim(),
+        customerPhone: customerPhone.trim(),
+        deliveryType,
+        address: addressObj,
+        paymentMethod,
+        changeFor: parsedChangeFor,
+        customerNotes: customerNotes.trim(),
+        deliveryFee,
+      });
 
-    // Generate link & trigger WhatsApp in new window/tab
-    const waUrl = generateWhatsAppLink(newOrder);
-    window.open(waUrl, '_blank');
-
-    // Notify success
-    onOrderSuccess(newOrder);
+      // Notify success to open OrderSuccessModal
+      onOrderSuccess(newOrder);
+    } catch {
+      setValidationError('Ocorreu um erro ao processar o seu pedido. Tente novamente.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -487,13 +492,14 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
           <div className="pt-2">
             <button
               type="submit"
-              className="w-full flex items-center justify-center gap-2.5 py-4 px-6 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500 text-slate-950 font-black text-sm sm:text-base rounded-2xl shadow-xl shadow-emerald-500/20 transition-all hover:scale-[1.01] active:scale-[0.99] cursor-pointer"
+              disabled={isSubmitting}
+              className="w-full flex items-center justify-center gap-2.5 py-4 px-6 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500 disabled:opacity-50 text-slate-950 font-black text-sm sm:text-base rounded-2xl shadow-xl shadow-emerald-500/20 transition-all hover:scale-[1.01] active:scale-[0.99] cursor-pointer"
             >
               <Send className="w-5 h-5 text-slate-950" />
-              <span>Enviar Pedido pelo WhatsApp</span>
+              <span>{isSubmitting ? 'Processando Pedido...' : 'Confirmar e Enviar Pedido'}</span>
             </button>
             <p className="text-[11px] text-center text-slate-500 mt-2">
-              Seu pedido será registrado no sistema e enviado diretamente ao WhatsApp da {store.name}
+              Seu pedido será registrado com segurança e você poderá conversar diretamente no WhatsApp da {store.name}
             </p>
           </div>
         </form>

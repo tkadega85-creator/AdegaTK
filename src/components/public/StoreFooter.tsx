@@ -10,6 +10,7 @@ export const StoreFooter: React.FC<StoreFooterProps> = ({ onOpenAdminLogin }) =>
   const { store } = useStore();
   const [deferredPrompt, setDeferredPrompt] = useState<unknown>(null);
   const [isInstalled, setIsInstalled] = useState(false);
+  const [showInstallGuide, setShowInstallGuide] = useState(false);
 
   useEffect(() => {
     // Listen for PWA beforeinstallprompt
@@ -32,7 +33,7 @@ export const StoreFooter: React.FC<StoreFooterProps> = ({ onOpenAdminLogin }) =>
       }
       setDeferredPrompt(null);
     } else {
-      alert('Para instalar este aplicativo no seu celular:\n• No Android/Chrome: Toque nos três pontinhos no topo e selecione "Adicionar à tela inicial".\n• No iPhone/Safari: Toque no botão Compartilhar e selecione "Adicionar à Tela de Início".');
+      setShowInstallGuide(true);
     }
   };
 
@@ -40,6 +41,30 @@ export const StoreFooter: React.FC<StoreFooterProps> = ({ onOpenAdminLogin }) =>
 
   return (
     <footer className="mt-16 bg-slate-950 border-t border-slate-800 text-slate-400 text-xs">
+      {/* Install Guide Modal */}
+      {showInstallGuide && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md">
+          <div className="relative w-full max-w-sm bg-slate-900 border border-slate-750 rounded-3xl p-6 text-center space-y-4 shadow-2xl">
+            <div className="text-3xl">📱</div>
+            <h3 className="text-base font-extrabold text-white">Como instalar no seu celular</h3>
+            <div className="text-left text-xs text-slate-300 space-y-2.5 bg-slate-950/80 p-4 rounded-2xl border border-slate-800">
+              <p>
+                <strong className="text-amber-400">Android / Chrome:</strong> Toque no menu (três pontinhos no topo) e escolha <em>"Adicionar à tela inicial"</em> ou <em>"Instalar aplicativo"</em>.
+              </p>
+              <p>
+                <strong className="text-sky-400">iPhone / Safari:</strong> Toque no botão de <em>Compartilhar</em> (ícone com quadrado e seta para cima) e selecione <em>"Adicionar à Tela de Início"</em>.
+              </p>
+            </div>
+            <button
+              onClick={() => setShowInstallGuide(false)}
+              className="w-full py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs rounded-xl transition-colors cursor-pointer"
+            >
+              Entendido
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* PWA Banner if not installed */}
       <div className="bg-gradient-to-r from-amber-500/10 via-slate-900 to-amber-500/10 border-b border-slate-800 py-3 px-4">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left">
@@ -70,31 +95,37 @@ export const StoreFooter: React.FC<StoreFooterProps> = ({ onOpenAdminLogin }) =>
         <div className="space-y-3">
           <div className="flex items-center gap-2">
             <span className="font-black text-xl text-white tracking-tight">
-              Adega<span className="text-amber-500">TK</span>
+              {store.name || 'Adega'}
             </span>
           </div>
-          <p className="text-slate-400 text-xs leading-relaxed">
-            {store.description}
-          </p>
+          {store.description && (
+            <p className="text-slate-400 text-xs leading-relaxed">
+              {store.description}
+            </p>
+          )}
           <div className="flex items-center gap-3 pt-2">
-            <a
-              href={`https://wa.me/${cleanPhone}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="w-8 h-8 rounded-lg bg-slate-900 border border-slate-800 hover:border-emerald-500/50 flex items-center justify-center text-slate-300 hover:text-emerald-400 transition-colors"
-              title="WhatsApp"
-            >
-              <Phone className="w-4 h-4" />
-            </a>
-            <a
-              href="https://instagram.com"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="w-8 h-8 rounded-lg bg-slate-900 border border-slate-800 hover:border-rose-500/50 flex items-center justify-center text-slate-300 hover:text-rose-400 transition-colors"
-              title="Instagram"
-            >
-              <Instagram className="w-4 h-4" />
-            </a>
+            {cleanPhone ? (
+              <a
+                href={`https://wa.me/${cleanPhone}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-8 h-8 rounded-lg bg-slate-900 border border-slate-800 hover:border-emerald-500/50 flex items-center justify-center text-slate-300 hover:text-emerald-400 transition-colors"
+                title="WhatsApp Comercial"
+              >
+                <Phone className="w-4 h-4" />
+              </a>
+            ) : null}
+            {store.instagram ? (
+              <a
+                href={`https://instagram.com/${store.instagram.replace('@', '')}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-8 h-8 rounded-lg bg-slate-900 border border-slate-800 hover:border-rose-500/50 flex items-center justify-center text-slate-300 hover:text-rose-400 transition-colors"
+                title={`Instagram ${store.instagram}`}
+              >
+                <Instagram className="w-4 h-4" />
+              </a>
+            ) : null}
           </div>
         </div>
 
@@ -103,21 +134,31 @@ export const StoreFooter: React.FC<StoreFooterProps> = ({ onOpenAdminLogin }) =>
           <h4 className="font-bold text-slate-200 text-xs uppercase tracking-wider mb-2">
             Localização & Contato
           </h4>
-          <p className="flex items-start gap-2 text-slate-300">
+          <div className="flex items-start gap-2 text-slate-300">
             <MapPin className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
             <span>
-              {store.address}, {store.neighborhood}<br />
-              {store.city} - {store.state} • CEP: {store.zipCode}
+              {store.address ? (
+                <>
+                  {store.address}{store.neighborhood ? `, ${store.neighborhood}` : ''}<br />
+                  {store.city ? `${store.city} - ${store.state}` : ''} {store.zipCode ? `• CEP: ${store.zipCode}` : ''}
+                </>
+              ) : (
+                'Endereço a ser configurado no painel'
+              )}
             </span>
-          </p>
-          <p className="flex items-center gap-2 text-slate-300 pt-1">
-            <Phone className="w-4 h-4 text-emerald-400 shrink-0" />
-            <span>{store.phone}</span>
-          </p>
-          <p className="flex items-center gap-2 text-slate-300">
-            <Instagram className="w-4 h-4 text-pink-400 shrink-0" />
-            <span>{store.instagram}</span>
-          </p>
+          </div>
+          {store.phone && (
+            <p className="flex items-center gap-2 text-slate-300 pt-1">
+              <Phone className="w-4 h-4 text-emerald-400 shrink-0" />
+              <span>{store.phone}</span>
+            </p>
+          )}
+          {store.instagram && (
+            <p className="flex items-center gap-2 text-slate-300">
+              <Instagram className="w-4 h-4 text-pink-400 shrink-0" />
+              <span>{store.instagram}</span>
+            </p>
+          )}
         </div>
 
         {/* Col 3: Horários */}

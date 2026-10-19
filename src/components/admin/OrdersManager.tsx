@@ -11,7 +11,6 @@ import {
   CheckCircle2,
   AlertCircle,
   Trash2,
-  PlusCircle,
   ExternalLink
 } from 'lucide-react';
 
@@ -22,10 +21,6 @@ export const OrdersManager: React.FC = () => {
     deleteOrder,
     generateWhatsAppLink,
     store,
-    createOrder,
-    cart,
-    addToCart,
-    products,
   } = useStore();
 
   const [activeTab, setActiveTab] = useState<string>('todos');
@@ -98,31 +93,6 @@ export const OrdersManager: React.FC = () => {
     return `https://wa.me/55${cleanPhone}?text=${encodeURIComponent(msg)}`;
   };
 
-  // Fast test order simulator for admin demonstrations
-  const handleSimulateTestOrder = () => {
-    if (products.length === 0) return;
-    const p1 = products[0];
-    const p2 = products[1] || products[0];
-    addToCart(p1, undefined, 2);
-    addToCart(p2, undefined, 1);
-
-    setTimeout(() => {
-      createOrder({
-        customerName: 'Cliente Teste Simulado',
-        customerPhone: '(11) 98888-7777',
-        deliveryType: 'delivery',
-        address: {
-          street: 'Av. Paulista',
-          number: '1000',
-          neighborhood: 'Bela Vista',
-        },
-        paymentMethod: 'pix',
-        deliveryFee: 8.0,
-        customerNotes: 'Pedido teste para verificar alerta e notificações do painel',
-      });
-    }, 100);
-  };
-
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -135,13 +105,11 @@ export const OrdersManager: React.FC = () => {
             Controle os pedidos em tempo real desde a chegada até a entrega final
           </p>
         </div>
-        <button
-          onClick={handleSimulateTestOrder}
-          className="flex items-center gap-2 px-3.5 py-2 bg-slate-800 hover:bg-slate-750 text-amber-400 border border-amber-500/30 font-bold text-xs rounded-xl transition-colors cursor-pointer shrink-0"
-        >
-          <PlusCircle className="w-4 h-4" />
-          <span>Simular Novo Pedido Teste</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-semibold px-3 py-1.5 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20">
+            {orders.length} pedido(s) registrado(s)
+          </span>
+        </div>
       </div>
 
       {/* Status Filter Tabs */}

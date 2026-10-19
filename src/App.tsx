@@ -167,15 +167,15 @@ const MainAppContent: React.FC = () => {
 
         {/* Products Grid */}
         {displayedProducts.length === 0 ? (
-          <div className="p-12 text-center bg-slate-900/50 border border-slate-800 rounded-3xl space-y-4 max-w-md mx-auto my-8">
-            <div className="text-4xl">🔍</div>
-            <h3 className="text-lg font-bold text-white">Nenhum produto encontrado</h3>
-            <p className="text-xs text-slate-400">
+          <div className="p-12 text-center bg-slate-900/50 border border-slate-800 rounded-3xl space-y-4 max-w-lg mx-auto my-8">
+            <div className="text-4xl">🍾</div>
+            <h3 className="text-lg font-bold text-white">Nenhum produto cadastrado no momento</h3>
+            <p className="text-xs text-slate-400 leading-relaxed">
               {searchQuery
-                ? `Não encontramos nenhum item com o termo "${searchQuery}". Tente pesquisar por outra bebida.`
-                : 'Esta categoria não possui produtos cadastrados no momento.'}
+                ? `Não encontramos nenhum item correspondente a "${searchQuery}".`
+                : 'Ainda não há produtos cadastrados nesta seção. O administrador pode adicionar bebidas, preços e fotos através do painel de controle.'}
             </p>
-            {(searchQuery || selectedCategoryId !== 'all') && (
+            {searchQuery ? (
               <button
                 onClick={() => {
                   setSearchQuery('');
@@ -183,7 +183,14 @@ const MainAppContent: React.FC = () => {
                 }}
                 className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs rounded-xl transition-all cursor-pointer"
               >
-                Ver Todas as Bebidas
+                Ver Todas as Categorias
+              </button>
+            ) : (
+              <button
+                onClick={handleOpenAdminLogin}
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-750 text-amber-400 border border-amber-500/30 font-bold text-xs rounded-xl transition-all cursor-pointer"
+              >
+                Acessar Painel de Administração
               </button>
             )}
           </div>
@@ -228,15 +235,26 @@ const MainAppContent: React.FC = () => {
           <span>Promoções</span>
         </button>
 
-        <a
-          href={`https://wa.me/${cleanPhone}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex flex-col items-center gap-1 text-[10px] font-bold text-slate-400 hover:text-white transition-colors"
-        >
-          <MessageCircle className="w-5 h-5 text-emerald-400" />
-          <span>WhatsApp</span>
-        </a>
+        {cleanPhone ? (
+          <a
+            href={`https://wa.me/${cleanPhone}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex flex-col items-center gap-1 text-[10px] font-bold text-slate-400 hover:text-white transition-colors"
+          >
+            <MessageCircle className="w-5 h-5 text-emerald-400" />
+            <span>WhatsApp</span>
+          </a>
+        ) : (
+          <button
+            onClick={handleOpenAdminLogin}
+            className="flex flex-col items-center gap-1 text-[10px] font-bold text-slate-400 hover:text-white transition-colors"
+            title="WhatsApp não configurado. Clique para acessar o painel."
+          >
+            <MessageCircle className="w-5 h-5 text-slate-500" />
+            <span>WhatsApp</span>
+          </button>
+        )}
 
         {/* Big Cart button */}
         <button

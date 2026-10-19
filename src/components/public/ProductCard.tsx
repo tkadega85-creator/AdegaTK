@@ -37,13 +37,21 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onOpenDetails
       className="group relative bg-slate-900/80 hover:bg-slate-900 border border-slate-800 hover:border-amber-500/50 rounded-2xl overflow-hidden transition-all duration-200 flex flex-col justify-between hover:shadow-xl hover:shadow-black/50 cursor-pointer"
     >
       {/* Top Image area */}
-      <div className="relative aspect-[4/3] w-full overflow-hidden bg-slate-950">
-        <img
-          src={product.imageUrl}
-          alt={product.name}
-          className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-300 filter brightness-95"
-          loading="lazy"
-        />
+      <div className="relative aspect-[4/3] w-full overflow-hidden bg-slate-950 flex items-center justify-center">
+        {product.imageUrl ? (
+          <img
+            src={product.imageUrl}
+            alt={product.name}
+            className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-300 filter brightness-95"
+            loading="lazy"
+            onError={(e) => {
+              // Hide broken image and show placeholder icon
+              (e.target as HTMLElement).style.display = 'none';
+            }}
+          />
+        ) : (
+          <span className="text-4xl text-amber-500/60 select-none">🍾</span>
+        )}
         <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-black/20" />
 
         {/* Badges Overlay */}
@@ -70,13 +78,17 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onOpenDetails
         )}
 
         {/* Stock warning */}
-        {!product.inStock && (
+        {!product.inStock || (typeof product.stockQuantity === 'number' && product.stockQuantity <= 0) ? (
           <div className="absolute inset-0 bg-slate-950/85 backdrop-blur-xs flex items-center justify-center">
             <span className="px-3 py-1 bg-rose-900/80 text-rose-200 text-xs font-bold rounded-lg border border-rose-700">
               Esgotado no momento
             </span>
           </div>
-        )}
+        ) : typeof product.stockQuantity === 'number' && product.stockQuantity <= 5 ? (
+          <span className="absolute bottom-2 left-2 text-[10px] font-bold text-amber-300 bg-amber-950/80 backdrop-blur-sm px-2 py-0.5 rounded border border-amber-800">
+            Últimas {product.stockQuantity} un.
+          </span>
+        ) : null}
       </div>
 
       {/* Content Area */}

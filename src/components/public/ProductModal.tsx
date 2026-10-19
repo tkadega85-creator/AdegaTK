@@ -64,12 +64,19 @@ export const ProductModal: React.FC<ProductModalProps> = ({ product, onClose }) 
         {/* Scrollable body */}
         <div className="overflow-y-auto flex-1">
           {/* Top Big Image */}
-          <div className="relative aspect-[16/10] w-full bg-slate-950">
-            <img
-              src={product.imageUrl}
-              alt={product.name}
-              className="w-full h-full object-cover"
-            />
+          <div className="relative aspect-[16/10] w-full bg-slate-950 flex items-center justify-center">
+            {product.imageUrl ? (
+              <img
+                src={product.imageUrl}
+                alt={product.name}
+                className="w-full h-full object-cover"
+                onError={(e) => {
+                  (e.target as HTMLElement).style.display = 'none';
+                }}
+              />
+            ) : (
+              <span className="text-6xl text-amber-500/50 select-none">🍾</span>
+            )}
             <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-transparent to-black/30" />
 
             {/* Badges on top of image */}
@@ -193,10 +200,12 @@ export const ProductModal: React.FC<ProductModalProps> = ({ product, onClose }) 
           {/* Add to Cart Submit button */}
           <button
             onClick={handleAdd}
-            disabled={!product.inStock}
+            disabled={!product.inStock || (typeof product.stockQuantity === 'number' && product.stockQuantity <= 0)}
             className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-bold text-sm sm:text-base shadow-lg transition-all cursor-pointer ${
               addedAnimation
                 ? 'bg-emerald-500 text-slate-950 scale-95'
+                : !product.inStock || (typeof product.stockQuantity === 'number' && product.stockQuantity <= 0)
+                ? 'bg-slate-800 text-slate-500 cursor-not-allowed'
                 : 'bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-amber-500/20 hover:scale-[1.02] active:scale-[0.98]'
             }`}
           >
@@ -205,6 +214,8 @@ export const ProductModal: React.FC<ProductModalProps> = ({ product, onClose }) 
                 <Check className="w-5 h-5 text-slate-950" />
                 <span>Adicionado!</span>
               </>
+            ) : !product.inStock || (typeof product.stockQuantity === 'number' && product.stockQuantity <= 0) ? (
+              <span>Produto Esgotado</span>
             ) : (
               <>
                 <ShoppingBag className="w-5 h-5" />
