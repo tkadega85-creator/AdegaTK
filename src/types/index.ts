@@ -1,5 +1,13 @@
 export type Role = 'admin' | 'gerente' | 'atendente';
 
+export interface UserPermissions {
+  canManageCatalog: boolean;
+  canManageOrders: boolean;
+  canManageFinances: boolean;
+  canManageUsers: boolean;
+  canManageSettings: boolean;
+}
+
 export interface AdminUser {
   id: string;
   name: string;
@@ -9,6 +17,8 @@ export interface AdminUser {
   isActive: boolean;
   avatarUrl?: string;
   passwordHash?: string;
+  permissions?: UserPermissions;
+  createdAt?: string;
 }
 
 export interface StoreAppearance {
@@ -37,15 +47,6 @@ export interface PaymentMethodsConfig {
   pixReceiverName: string;
 }
 
-export interface DeliveryZone {
-  id: string;
-  storeId: string;
-  neighborhood: string;
-  fee: number;
-  estimatedTime: string;
-  isActive: boolean;
-}
-
 export interface ProductVariant {
   id: string;
   name: string; // e.g. "Lata 350ml", "Garrafa 600ml", "Dose 50ml"
@@ -61,6 +62,7 @@ export interface Product {
   description: string;
   price: number;
   promoPrice?: number | null;
+  costPrice?: number | null; // Custo do produto para cálculo de CMV e margem
   imageUrl: string;
   inStock: boolean;
   stockQuantity?: number;
@@ -106,7 +108,7 @@ export interface CartItem {
   notes?: string;
 }
 
-export type OrderStatus = 'novo' | 'confirmado' | 'preparando' | 'saiu_entrega' | 'entregue' | 'cancelado';
+export type OrderStatus = 'novo' | 'confirmado' | 'preparando' | 'pronto_retirada' | 'finalizado' | 'cancelado';
 
 export interface OrderItem {
   productId: string;
@@ -119,12 +121,26 @@ export interface OrderItem {
 }
 
 export interface CustomerAddress {
-  street: string;
-  number: string;
+  street?: string;
+  number?: string;
   complement?: string;
-  neighborhood: string;
+  neighborhood?: string;
   reference?: string;
   city?: string;
+}
+
+export interface Customer {
+  id: string;
+  storeId: string;
+  name: string;
+  phone: string;
+  email?: string;
+  address?: CustomerAddress;
+  notes?: string;
+  totalOrders: number;
+  totalSpent: number;
+  lastOrderAt?: string;
+  createdAt: string;
 }
 
 export interface Order {
@@ -133,17 +149,37 @@ export interface Order {
   storeId: string;
   customerName: string;
   customerPhone: string;
-  deliveryType: 'delivery' | 'retirada';
+  deliveryType: 'retirada' | 'balcao';
   address?: CustomerAddress;
   paymentMethod: 'pix' | 'dinheiro' | 'cartao_credito' | 'cartao_debito';
   changeFor?: number;
   items: OrderItem[];
   subtotal: number;
-  deliveryFee: number;
+  deliveryFee: number; // Always 0 for in-store pickup
   discount: number;
   total: number;
   status: OrderStatus;
   customerNotes?: string;
+  createdAt: string;
+}
+
+export type ExpenseCategory =
+  | 'Fornecedores'
+  | 'Aluguel'
+  | 'Energia/Água'
+  | 'Funcionários'
+  | 'Embalagens'
+  | 'Manutenção'
+  | 'Outros';
+
+export interface Expense {
+  id: string;
+  storeId: string;
+  description: string;
+  category: ExpenseCategory;
+  amount: number;
+  date: string; // YYYY-MM-DD
+  notes?: string;
   createdAt: string;
 }
 
@@ -162,9 +198,6 @@ export interface Store {
   state: string;
   zipCode: string;
   minOrderValue: number;
-  freeDeliveryOver: number;
-  defaultDeliveryFee: number;
-  estimatedDeliveryTime: string;
   isOpenOverride: boolean | null; // null = use business hours
   appearance: StoreAppearance;
   businessHours: BusinessDayHours[];

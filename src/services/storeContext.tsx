@@ -4,7 +4,6 @@ import {
   Category,
   Product,
   Combo,
-  DeliveryZone,
   Order,
   AdminUser,
   CartItem,
@@ -13,19 +12,24 @@ import {
   StoreAppearance,
   BusinessDayHours,
   PaymentMethodsConfig,
-  CustomerAddress
+  CustomerAddress,
+  Customer,
+  Expense
 } from '../types';
 import {
   INITIAL_STORE,
   INITIAL_CATEGORIES,
   INITIAL_PRODUCTS,
   INITIAL_COMBOS,
-  INITIAL_DELIVERY_ZONES,
   INITIAL_ORDERS,
+  INITIAL_CUSTOMERS,
+  INITIAL_EXPENSES,
   INITIAL_USERS
 } from './mockData';
+import { db, handleFirestoreError, OperationType, testFirestoreConnection } from './firebase';
+import { doc, setDoc, deleteDoc } from 'firebase/firestore';
 
-const STORAGE_PREFIX = 'adegatk_v2_';
+const STORAGE_PREFIX = 'adegatk_v4_';
 
 interface StoreContextType {
   // Store & Settings
@@ -56,27 +60,30 @@ interface StoreContextType {
   updateCombo: (id: string, updated: Partial<Combo>) => Promise<void>;
   deleteCombo: (id: string) => Promise<void>;
 
-  // Delivery Zones
-  deliveryZones: DeliveryZone[];
-  addDeliveryZone: (zone: Omit<DeliveryZone, 'id' | 'storeId'>) => Promise<DeliveryZone>;
-  updateDeliveryZone: (id: string, updated: Partial<DeliveryZone>) => Promise<void>;
-  deleteDeliveryZone: (id: string) => Promise<void>;
-
-  // Orders
+  // Orders (Balcão / Retirada)
   orders: Order[];
   createOrder: (orderData: {
     customerName: string;
     customerPhone: string;
-    deliveryType: 'delivery' | 'retirada';
-    address?: CustomerAddress;
     paymentMethod: 'pix' | 'dinheiro' | 'cartao_credito' | 'cartao_debito';
     changeFor?: number;
     customerNotes?: string;
-    deliveryFee: number;
   }) => Promise<Order>;
   updateOrderStatus: (orderId: string, status: OrderStatus) => Promise<void>;
   deleteOrder: (orderId: string) => Promise<void>;
   pendingOrdersCount: number;
+
+  // Customers
+  customers: Customer[];
+  addCustomer: (cust: Omit<Customer, 'id' | 'storeId' | 'totalOrders' | 'totalSpent' | 'createdAt'>) => Promise<Customer>;
+  updateCustomer: (id: string, updated: Partial<Customer>) => Promise<void>;
+  deleteCustomer: (id: string) => Promise<void>;
+
+  // Expenses (Painel Financeiro)
+  expenses: Expense[];
+  addExpense: (expense: Omit<Expense, 'id' | 'storeId' | 'createdAt'>) => Promise<Expense>;
+  updateExpense: (id: string, updated: Partial<Expense>) => Promise<void>;
+  deleteExpense: (id: string) => Promise<void>;
 
   // Cart
   cart: CartItem[];
@@ -90,7 +97,7 @@ interface StoreContextType {
   // WhatsApp
   generateWhatsAppLink: (order: Order) => string;
 
-  // Admin Auth & Users
+  // Admin Auth & Dual Accounts
   currentUser: AdminUser | null;
   adminUsers: AdminUser[];
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
@@ -103,6 +110,7 @@ interface StoreContextType {
   // Clean data management
   resetToCleanDefaults: () => Promise<void>;
   isLoading: boolean;
+  isFirebaseConnected: boolean;
 }
 
 const StoreContext = createContext<StoreContextType | undefined>(undefined);
@@ -150,36 +158,46 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [categories, setCategories] = useState<Category[]>(() => loadFromStorage('categories', INITIAL_CATEGORIES));
   const [products, setProducts] = useState<Product[]>(() => loadFromStorage('products', INITIAL_PRODUCTS));
   const [combos, setCombos] = useState<Combo[]>(() => loadFromStorage('combos', INITIAL_COMBOS));
-  const [deliveryZones, setDeliveryZones] = useState<DeliveryZone[]>(() => loadFromStorage('delivery_zones', INITIAL_DELIVERY_ZONES));
   const [orders, setOrders] = useState<Order[]>(() => loadFromStorage('orders', INITIAL_ORDERS));
+  const [customers, setCustomers] = useState<Customer[]>(() => loadFromStorage('customers', INITIAL_CUSTOMERS));
+  const [expenses, setExpenses] = useState<Expense[]>(() => loadFromStorage('expenses', INITIAL_EXPENSES));
   const [adminUsers, setAdminUsers] = useState<AdminUser[]>(() => loadFromStorage('users', INITIAL_USERS));
   const [currentUser, setCurrentUser] = useState<AdminUser | null>(() => loadFromStorage('current_user', null));
   const [cart, setCart] = useState<CartItem[]>(() => loadFromStorage('cart', []));
   const [isLoading, setIsLoading] = useState(false);
+  const [isFirebaseConnected, setIsFirebaseConnected] = useState(false);
 
   // Sync to local storage
   useEffect(() => { saveToStorage('store', store); }, [store]);
   useEffect(() => { saveToStorage('categories', categories); }, [categories]);
   useEffect(() => { saveToStorage('products', products); }, [products]);
   useEffect(() => { saveToStorage('combos', combos); }, [combos]);
-  useEffect(() => { saveToStorage('delivery_zones', deliveryZones); }, [deliveryZones]);
   useEffect(() => { saveToStorage('orders', orders); }, [orders]);
+  useEffect(() => { saveToStorage('customers', customers); }, [customers]);
+  useEffect(() => { saveToStorage('expenses', expenses); }, [expenses]);
   useEffect(() => { saveToStorage('users', adminUsers); }, [adminUsers]);
   useEffect(() => { saveToStorage('current_user', currentUser); }, [currentUser]);
   useEffect(() => { saveToStorage('cart', cart); }, [cart]);
 
-  // Sync with backend API on mount if available
+  // Sync with backend API & test Firestore connection on mount
   useEffect(() => {
     let isMounted = true;
+
+    // Check Firebase connectivity
+    testFirestoreConnection().then((connected) => {
+      if (isMounted) setIsFirebaseConnected(connected);
+    });
+
     const fetchServerData = async () => {
       try {
-        const [resStore, resCats, resProds, resCombos, resZones, resOrders, resUsers] = await Promise.all([
+        const [resStore, resCats, resProds, resCombos, resOrders, resCustomers, resExpenses, resUsers] = await Promise.all([
           fetch('/api/store').then((r) => r.ok ? r.json() : null).catch(() => null),
           fetch('/api/categories').then((r) => r.ok ? r.json() : null).catch(() => null),
           fetch('/api/products').then((r) => r.ok ? r.json() : null).catch(() => null),
           fetch('/api/combos').then((r) => r.ok ? r.json() : null).catch(() => null),
-          fetch('/api/delivery-zones').then((r) => r.ok ? r.json() : null).catch(() => null),
           fetch('/api/orders').then((r) => r.ok ? r.json() : null).catch(() => null),
+          fetch('/api/customers').then((r) => r.ok ? r.json() : null).catch(() => null),
+          fetch('/api/expenses').then((r) => r.ok ? r.json() : null).catch(() => null),
           fetch('/api/users').then((r) => r.ok ? r.json() : null).catch(() => null),
         ]);
 
@@ -189,11 +207,12 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         if (resCats?.success && Array.isArray(resCats.categories)) setCategories(resCats.categories);
         if (resProds?.success && Array.isArray(resProds.products)) setProducts(resProds.products);
         if (resCombos?.success && Array.isArray(resCombos.combos)) setCombos(resCombos.combos);
-        if (resZones?.success && Array.isArray(resZones.deliveryZones)) setDeliveryZones(resZones.deliveryZones);
         if (resOrders?.success && Array.isArray(resOrders.orders)) setOrders(resOrders.orders);
+        if (resCustomers?.success && Array.isArray(resCustomers.customers)) setCustomers(resCustomers.customers);
+        if (resExpenses?.success && Array.isArray(resExpenses.expenses)) setExpenses(resExpenses.expenses);
         if (resUsers?.success && Array.isArray(resUsers.users)) setAdminUsers(resUsers.users);
       } catch (err) {
-        console.info('Backend API unavailable, using offline/local storage sync.');
+        console.info('Using local client state sync.');
       }
     };
 
@@ -253,14 +272,15 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newStore),
       });
-    } catch {}
+      // Sync to Firestore
+      await setDoc(doc(db, 'stores', store.id), newStore).catch(() => {});
+    } catch (err) {
+      console.warn('Sync failed:', err);
+    }
   };
 
   const updateAppearance = async (appearance: Partial<StoreAppearance>) => {
-    const newStore = {
-      ...store,
-      appearance: { ...store.appearance, ...appearance },
-    };
+    const newStore = { ...store, appearance: { ...store.appearance, ...appearance } };
     setStore(newStore);
     try {
       await fetch('/api/store', {
@@ -268,14 +288,12 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newStore),
       });
+      await setDoc(doc(db, 'stores', store.id), newStore).catch(() => {});
     } catch {}
   };
 
   const updatePayments = async (payments: Partial<PaymentMethodsConfig>) => {
-    const newStore = {
-      ...store,
-      payments: { ...store.payments, ...payments },
-    };
+    const newStore = { ...store, payments: { ...store.payments, ...payments } };
     setStore(newStore);
     try {
       await fetch('/api/store', {
@@ -283,6 +301,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newStore),
       });
+      await setDoc(doc(db, 'stores', store.id), newStore).catch(() => {});
     } catch {}
   };
 
@@ -295,6 +314,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newStore),
       });
+      await setDoc(doc(db, 'stores', store.id), newStore).catch(() => {});
     } catch {}
   };
 
@@ -307,15 +327,12 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     };
     setCategories((prev) => [...prev, newCategory]);
     try {
-      const res = await fetch('/api/categories', {
+      await fetch('/api/categories', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newCategory),
       });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.category) return data.category;
-      }
+      await setDoc(doc(db, 'categories', newCategory.id), newCategory).catch(() => {});
     } catch {}
     return newCategory;
   };
@@ -328,6 +345,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updated),
       });
+      await setDoc(doc(db, 'categories', id), updated, { merge: true }).catch(() => {});
     } catch {}
   };
 
@@ -335,6 +353,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setCategories((prev) => prev.filter((c) => c.id !== id));
     try {
       await fetch(`/api/categories/${id}`, { method: 'DELETE' });
+      await deleteDoc(doc(db, 'categories', id)).catch(() => {});
     } catch {}
   };
 
@@ -347,15 +366,12 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     };
     setProducts((prev) => [newProduct, ...prev]);
     try {
-      const res = await fetch('/api/products', {
+      await fetch('/api/products', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newProduct),
       });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.product) return data.product;
-      }
+      await setDoc(doc(db, 'products', newProduct.id), newProduct).catch(() => {});
     } catch {}
     return newProduct;
   };
@@ -368,6 +384,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updated),
       });
+      await setDoc(doc(db, 'products', id), updated, { merge: true }).catch(() => {});
     } catch {}
   };
 
@@ -375,6 +392,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setProducts((prev) => prev.filter((p) => p.id !== id));
     try {
       await fetch(`/api/products/${id}`, { method: 'DELETE' });
+      await deleteDoc(doc(db, 'products', id)).catch(() => {});
     } catch {}
   };
 
@@ -394,6 +412,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(duplicated),
       });
+      await setDoc(doc(db, 'products', duplicated.id), duplicated).catch(() => {});
     } catch {}
   };
 
@@ -406,15 +425,12 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     };
     setCombos((prev) => [newCombo, ...prev]);
     try {
-      const res = await fetch('/api/combos', {
+      await fetch('/api/combos', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newCombo),
       });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.combo) return data.combo;
-      }
+      await setDoc(doc(db, 'combos', newCombo.id), newCombo).catch(() => {});
     } catch {}
     return newCombo;
   };
@@ -427,6 +443,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updated),
       });
+      await setDoc(doc(db, 'combos', id), updated, { merge: true }).catch(() => {});
     } catch {}
   };
 
@@ -434,46 +451,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setCombos((prev) => prev.filter((c) => c.id !== id));
     try {
       await fetch(`/api/combos/${id}`, { method: 'DELETE' });
-    } catch {}
-  };
-
-  // Delivery Zones CRUD
-  const addDeliveryZone = async (zone: Omit<DeliveryZone, 'id' | 'storeId'>): Promise<DeliveryZone> => {
-    const newZone: DeliveryZone = {
-      ...zone,
-      id: `zone-${Date.now()}`,
-      storeId: store.id,
-    };
-    setDeliveryZones((prev) => [...prev, newZone]);
-    try {
-      const res = await fetch('/api/delivery-zones', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newZone),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.zone) return data.zone;
-      }
-    } catch {}
-    return newZone;
-  };
-
-  const updateDeliveryZone = async (id: string, updated: Partial<DeliveryZone>) => {
-    setDeliveryZones((prev) => prev.map((z) => (z.id === id ? { ...z, ...updated } : z)));
-    try {
-      await fetch(`/api/delivery-zones/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updated),
-      });
-    } catch {}
-  };
-
-  const deleteDeliveryZone = async (id: string) => {
-    setDeliveryZones((prev) => prev.filter((z) => z.id !== id));
-    try {
-      await fetch(`/api/delivery-zones/${id}`, { method: 'DELETE' });
+      await deleteDoc(doc(db, 'combos', id)).catch(() => {});
     } catch {}
   };
 
@@ -541,16 +519,13 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return cart.reduce((acc, item) => acc + item.quantity, 0);
   }, [cart]);
 
-  // Orders creation
+  // Orders creation (Retirada no Balcão Only)
   const createOrder = async (orderData: {
     customerName: string;
     customerPhone: string;
-    deliveryType: 'delivery' | 'retirada';
-    address?: CustomerAddress;
     paymentMethod: 'pix' | 'dinheiro' | 'cartao_credito' | 'cartao_debito';
     changeFor?: number;
     customerNotes?: string;
-    deliveryFee: number;
   }): Promise<Order> => {
     const newOrderNumber =
       orders.length > 0 ? Math.max(...orders.map((o) => o.orderNumber || 1000)) + 1 : 1001;
@@ -568,7 +543,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }));
 
     const subtotal = cartSubtotal;
-    const deliveryFee = orderData.deliveryType === 'delivery' ? orderData.deliveryFee : 0;
+    const deliveryFee = 0; // Strictly 0 - Balcão only
     const discount = 0;
     const total = subtotal + deliveryFee - discount;
 
@@ -578,13 +553,12 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       storeId: store.id,
       customerName: orderData.customerName,
       customerPhone: orderData.customerPhone,
-      deliveryType: orderData.deliveryType,
-      address: orderData.address,
+      deliveryType: 'retirada',
       paymentMethod: orderData.paymentMethod,
       changeFor: orderData.changeFor,
       items,
       subtotal,
-      deliveryFee,
+      deliveryFee: 0,
       discount,
       total,
       status: 'novo',
@@ -618,6 +592,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newOrder),
       });
+      await setDoc(doc(db, 'orders', newOrder.id), newOrder).catch(() => {});
     } catch {}
 
     return newOrder;
@@ -631,6 +606,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status }),
       });
+      await setDoc(doc(db, 'orders', orderId), { status }, { merge: true }).catch(() => {});
     } catch {}
   };
 
@@ -638,6 +614,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setOrders((prev) => prev.filter((o) => o.id !== orderId));
     try {
       await fetch(`/api/orders/${orderId}`, { method: 'DELETE' });
+      await deleteDoc(doc(db, 'orders', orderId)).catch(() => {});
     } catch {}
   };
 
@@ -645,7 +622,89 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return orders.filter((o) => o.status === 'novo' || o.status === 'confirmado' || o.status === 'preparando').length;
   }, [orders]);
 
-  // WhatsApp Message Generator
+  // Expenses CRUD (Painel Financeiro)
+  const addExpense = async (exp: Omit<Expense, 'id' | 'storeId' | 'createdAt'>): Promise<Expense> => {
+    const newExpense: Expense = {
+      ...exp,
+      id: `exp-${Date.now()}`,
+      storeId: store.id,
+      createdAt: new Date().toISOString(),
+    };
+    setExpenses((prev) => [newExpense, ...prev]);
+    try {
+      await fetch('/api/expenses', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newExpense),
+      });
+      await setDoc(doc(db, 'expenses', newExpense.id), newExpense).catch(() => {});
+    } catch {}
+    return newExpense;
+  };
+
+  const updateExpense = async (id: string, updated: Partial<Expense>) => {
+    setExpenses((prev) => prev.map((e) => (e.id === id ? { ...e, ...updated } : e)));
+    try {
+      await fetch(`/api/expenses/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updated),
+      });
+      await setDoc(doc(db, 'expenses', id), updated, { merge: true }).catch(() => {});
+    } catch {}
+  };
+
+  const deleteExpense = async (id: string) => {
+    setExpenses((prev) => prev.filter((e) => e.id !== id));
+    try {
+      await fetch(`/api/expenses/${id}`, { method: 'DELETE' });
+      await deleteDoc(doc(db, 'expenses', id)).catch(() => {});
+    } catch {}
+  };
+
+  // Customers CRUD
+  const addCustomer = async (cust: Omit<Customer, 'id' | 'storeId' | 'totalOrders' | 'totalSpent' | 'createdAt'>): Promise<Customer> => {
+    const newCust: Customer = {
+      ...cust,
+      id: `cust-${Date.now()}`,
+      storeId: store.id,
+      totalOrders: 0,
+      totalSpent: 0,
+      createdAt: new Date().toISOString(),
+    };
+    setCustomers((prev) => [newCust, ...prev]);
+    try {
+      await fetch('/api/customers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newCust),
+      });
+      await setDoc(doc(db, 'customers', newCust.id), newCust).catch(() => {});
+    } catch {}
+    return newCust;
+  };
+
+  const updateCustomer = async (id: string, updated: Partial<Customer>) => {
+    setCustomers((prev) => prev.map((c) => (c.id === id ? { ...c, ...updated } : c)));
+    try {
+      await fetch(`/api/customers/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updated),
+      });
+      await setDoc(doc(db, 'customers', id), updated, { merge: true }).catch(() => {});
+    } catch {}
+  };
+
+  const deleteCustomer = async (id: string) => {
+    setCustomers((prev) => prev.filter((c) => c.id !== id));
+    try {
+      await fetch(`/api/customers/${id}`, { method: 'DELETE' });
+      await deleteDoc(doc(db, 'customers', id)).catch(() => {});
+    } catch {}
+  };
+
+  // WhatsApp Message Generator for In-Store Pickup
   const generateWhatsAppLink = (order: Order): string => {
     const cleanPhone = (store.whatsappNumber || '').replace(/\D/g, '');
     if (!cleanPhone) {
@@ -654,12 +713,12 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     const formatBRL = (val: number) => `R$ ${val.toFixed(2).replace('.', ',')}`;
 
-    let msg = `Olá! Gostaria de fazer um pedido na *${store.name}*:\n\n`;
+    let msg = `Olá! Gostaria de fazer um pedido para *Retirada no Balcão* na *${store.name}*:\n\n`;
     msg += `🛒 *PEDIDO #${order.orderNumber}*\n`;
     msg += `👤 Cliente: ${order.customerName}\n`;
     msg += `📱 Telefone: ${order.customerPhone}\n\n`;
 
-    msg += `*ITENS:*\n`;
+    msg += `*ITENS DO PEDIDO:*\n`;
     order.items.forEach((item) => {
       msg += `• ${item.quantity}x ${item.productName} — ${formatBRL(item.totalPrice)}\n`;
       if (item.notes) {
@@ -667,30 +726,17 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
     });
 
-    msg += `\nSubtotal: ${formatBRL(order.subtotal)}\n`;
-    if (order.deliveryType === 'delivery') {
-      msg += `Taxa de Entrega: ${order.deliveryFee === 0 ? 'GRÁTIS' : formatBRL(order.deliveryFee)}\n`;
-    } else {
-      msg += `Forma: *Retirada no Balcão*\n`;
-    }
-    msg += `*TOTAL: ${formatBRL(order.total)}*\n\n`;
-
-    if (order.deliveryType === 'delivery' && order.address) {
-      msg += `📍 *ENTREGA:*\n`;
-      msg += `${order.address.street}, Nº ${order.address.number}\n`;
-      if (order.address.complement) msg += `Compl: ${order.address.complement}\n`;
-      msg += `Bairro: ${order.address.neighborhood}\n`;
-      if (order.address.reference) msg += `Ref: ${order.address.reference}\n`;
-      msg += `\n`;
-    } else {
-      msg += `🏬 *RETIRADA:*\nRetirar no balcão da loja\n\n`;
+    msg += `\n*TOTAL: ${formatBRL(order.total)}*\n`;
+    msg += `🏪 Modalidade: *Retirada no Balcão*\n`;
+    if (store.address) {
+      msg += `📍 Endereço da Adega: ${store.address}${store.neighborhood ? `, ${store.neighborhood}` : ''}\n`;
     }
 
     const paymentLabel = {
       pix: 'PIX',
       dinheiro: 'Dinheiro',
-      cartao_credito: 'Cartão de Crédito',
-      cartao_debito: 'Cartão de Débito',
+      cartao_credito: 'Cartão de Crédito (no Balcão)',
+      cartao_debito: 'Cartão de Débito (no Balcão)',
     }[order.paymentMethod];
 
     msg += `💳 *PAGAMENTO:* ${paymentLabel}\n`;
@@ -708,13 +754,13 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       msg += `\n📝 *Observações:* ${order.customerNotes}\n`;
     }
 
-    msg += `\nObrigado! Aguardo a confirmação.`;
+    msg += `\nAguardo a confirmação para buscar! Obrigado.`;
 
     const encoded = encodeURIComponent(msg);
     return `https://wa.me/${cleanPhone}?text=${encoded}`;
   };
 
-  // Admin Auth
+  // Admin Auth & Dual Accounts
   const login = async (email: string, pass: string): Promise<{ success: boolean; error?: string }> => {
     try {
       const res = await fetch('/api/auth/login', {
@@ -727,7 +773,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         setCurrentUser(data.user);
         return { success: true };
       } else {
-        // Fallback for purely client-side running
         const user = adminUsers.find(
           (u) => u.email.toLowerCase() === email.trim().toLowerCase() && u.isActive
         );
@@ -738,7 +783,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         return { success: false, error: data.error || 'Credenciais inválidas.' };
       }
     } catch {
-      // Local fallback
       const user = adminUsers.find(
         (u) => u.email.toLowerCase() === email.trim().toLowerCase() && u.isActive
       );
@@ -774,6 +818,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       ...user,
       id: `user-${Date.now()}`,
       storeId: store.id,
+      createdAt: new Date().toISOString(),
     };
     setAdminUsers((prev) => [...prev, newUser]);
     try {
@@ -808,8 +853,9 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setCategories(INITIAL_CATEGORIES);
     setProducts([]);
     setCombos([]);
-    setDeliveryZones([]);
     setOrders([]);
+    setCustomers([]);
+    setExpenses([]);
     setAdminUsers(INITIAL_USERS);
     setCart([]);
     localStorage.clear();
@@ -841,15 +887,19 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         addCombo,
         updateCombo,
         deleteCombo,
-        deliveryZones,
-        addDeliveryZone,
-        updateDeliveryZone,
-        deleteDeliveryZone,
         orders,
         createOrder,
         updateOrderStatus,
         deleteOrder,
         pendingOrdersCount,
+        customers,
+        addCustomer,
+        updateCustomer,
+        deleteCustomer,
+        expenses,
+        addExpense,
+        updateExpense,
+        deleteExpense,
         cart,
         addToCart,
         updateCartItemQuantity,
@@ -868,6 +918,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         deleteUser,
         resetToCleanDefaults,
         isLoading,
+        isFirebaseConnected,
       }}
     >
       {children}

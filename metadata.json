@@ -1,7 +1,6 @@
 {
-  "name": "AdegaTK – Cardápio Digital & Delivery",
-  "description": "Sistema completo e premium de cardápio digital e delivery para adegas, distribuidoras de bebidas e conveniências com checkout WhatsApp e painel administrativo.",
+  "name": "AdegaTK – Cardápio Digital & Retirada no Balcão",
+  "description": "Sistema comercial de cardápio digital, gestão de produtos, controle financeiro DRE e pedidos para retirada no balcão da adega com checkout WhatsApp e painel administrativo.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
-

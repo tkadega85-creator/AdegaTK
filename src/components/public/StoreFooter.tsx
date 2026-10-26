@@ -192,7 +192,7 @@ export const StoreFooter: React.FC<StoreFooterProps> = ({ onOpenAdminLogin }) =>
             <span>Segurança & Pagamentos</span>
           </h4>
           <p className="text-xs text-slate-400">
-            Aceitamos PIX, Cartão de Crédito, Débito e Dinheiro. Pagamento seguro com motoboy ou chave PIX direta.
+            Aceitamos PIX, Cartão de Crédito, Débito e Dinheiro. Pagamento seguro no balcão da adega ou chave PIX direta.
           </p>
           <div className="pt-2">
             <button

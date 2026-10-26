@@ -8,7 +8,7 @@ import {
   Flame,
   Gift,
   Star,
-  Truck,
+  DollarSign,
   CreditCard,
   Clock,
   Store,
@@ -25,7 +25,7 @@ import { ProductsManager } from './ProductsManager';
 import { CategoriesManager } from './CategoriesManager';
 import { OrdersManager } from './OrdersManager';
 import { CombosManager } from './CombosManager';
-import { DeliveryManager } from './DeliveryManager';
+import { FinancialManager } from './FinancialManager';
 import { PaymentManager } from './PaymentManager';
 import { HoursManager } from './HoursManager';
 import { StoreInfoManager } from './StoreInfoManager';
@@ -48,12 +48,12 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ onBackToStore }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
 
   const menuItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'orders', label: 'Pedidos', icon: ShoppingBag, badge: pendingOrdersCount },
+    { id: 'dashboard', label: 'Dashboard Geral', icon: LayoutDashboard },
+    { id: 'orders', label: 'Pedidos (Balcão)', icon: ShoppingBag, badge: pendingOrdersCount },
+    { id: 'finances', label: 'Financeiro & Despesas', icon: DollarSign },
     { id: 'products', label: 'Produtos', icon: Package },
     { id: 'categories', label: 'Categorias', icon: Layers },
     { id: 'combos', label: 'Combos & Kits', icon: Gift },
-    { id: 'delivery', label: 'Delivery & Taxas', icon: Truck },
     { id: 'payments', label: 'Formas de Pagamento', icon: CreditCard },
     { id: 'hours', label: 'Horários da Loja', icon: Clock },
     { id: 'store_info', label: 'Dados da Loja', icon: Store },
@@ -70,16 +70,16 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ onBackToStore }) => {
     switch (activeTab) {
       case 'dashboard':
         return <DashboardView onNavigateTab={(tab) => setActiveTab(tab)} />;
+      case 'orders':
+        return <OrdersManager />;
+      case 'finances':
+        return <FinancialManager />;
       case 'products':
         return <ProductsManager />;
       case 'categories':
         return <CategoriesManager />;
-      case 'orders':
-        return <OrdersManager />;
       case 'combos':
         return <CombosManager />;
-      case 'delivery':
-        return <DeliveryManager />;
       case 'payments':
         return <PaymentManager />;
       case 'hours':

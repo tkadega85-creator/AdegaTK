@@ -44,32 +44,32 @@ export const OrderSuccessModal: React.FC<OrderSuccessModalProps> = ({ order, onC
           <div className="flex items-center justify-between text-xs font-semibold text-slate-300">
             <span className="flex items-center gap-1.5">
               <Clock className="w-3.5 h-3.5 text-amber-500" />
-              Tempo estimado de entrega:
+              Modalidade:
             </span>
-            <span className="text-amber-400 font-bold">{store.estimatedDeliveryTime}</span>
+            <span className="text-amber-400 font-bold">Retirada no Balcão</span>
           </div>
 
           {/* Simple step tracker */}
           <div className="pt-2 border-t border-slate-800 space-y-2">
             <div className="flex items-center gap-2.5 text-xs text-emerald-400 font-bold">
               <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping shrink-0" />
-              <span>1. Pedido enviado para a Adega</span>
+              <span>1. Pedido recebido na Adega</span>
             </div>
-            <div className="flex items-center gap-2.5 text-xs text-slate-500">
+            <div className="flex items-center gap-2.5 text-xs text-slate-400">
               <span className="w-2.5 h-2.5 rounded-full bg-slate-700 shrink-0" />
-              <span>2. Bebidas separadas e trincando</span>
+              <span>2. Bebidas trincando de geladas separadas</span>
             </div>
-            <div className="flex items-center gap-2.5 text-xs text-slate-500">
+            <div className="flex items-center gap-2.5 text-xs text-slate-400">
               <span className="w-2.5 h-2.5 rounded-full bg-slate-700 shrink-0" />
-              <span>3. A caminho da sua casa com motoboy</span>
+              <span>3. Disponível para retirada no balcão</span>
             </div>
           </div>
 
-          {order.deliveryType === 'delivery' && order.address && (
-            <div className="pt-2 border-t border-slate-800 text-[11px] text-slate-400 flex items-start gap-1.5">
+          {store.address && (
+            <div className="pt-2 border-t border-slate-800 text-[11px] text-slate-300 flex items-start gap-1.5">
               <MapPin className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
               <span className="line-clamp-2">
-                {order.address.street}, {order.address.number} - {order.address.neighborhood}
+                Local de Retirada: <strong>{store.address}{store.neighborhood ? `, ${store.neighborhood}` : ''}</strong>
               </span>
             </div>
           )}

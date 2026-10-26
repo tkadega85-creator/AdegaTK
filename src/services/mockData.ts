@@ -1,11 +1,11 @@
-import { Store, Category, Product, Combo, DeliveryZone, AdminUser, Order } from '../types';
+import { Store, Category, Product, Combo, AdminUser, Order, Customer, Expense } from '../types';
 
 export const INITIAL_STORE: Store = {
   id: 'adegatk',
   slug: 'adegatk',
   name: 'AdegaTK',
-  slogan: 'Cardápio Digital & Delivery',
-  description: '',
+  slogan: 'Cardápio Digital & Retirada no Balcão',
+  description: 'As melhores bebidas, vinhos, destilados e cervejas geladas para retirada imediata.',
   phone: '',
   whatsappNumber: '',
   instagram: '',
@@ -15,15 +15,12 @@ export const INITIAL_STORE: Store = {
   state: '',
   zipCode: '',
   minOrderValue: 0,
-  freeDeliveryOver: 0,
-  defaultDeliveryFee: 0,
-  estimatedDeliveryTime: '30 - 50 min',
   isOpenOverride: null,
   appearance: {
-    theme: 'dark-amber',
-    primaryColor: '#f59e0b',
+    theme: 'luxury-gold',
+    primaryColor: '#eab308',
     accentColor: '#d97706',
-    bannerUrl: '',
+    bannerUrl: 'https://images.unsplash.com/photo-1527281400683-1aae777175f8?w=1400&auto=format&fit=crop&q=80',
     logoUrl: '',
   },
   businessHours: [
@@ -47,32 +44,40 @@ export const INITIAL_STORE: Store = {
 };
 
 export const INITIAL_CATEGORIES: Category[] = [
-  { id: 'cat-cervejas', storeId: 'adegatk', name: 'Cervejas', icon: '🍺', description: '', order: 1, isActive: true },
-  { id: 'cat-destilados', storeId: 'adegatk', name: 'Destilados', icon: '🥃', description: '', order: 2, isActive: true },
-  { id: 'cat-vinhos', storeId: 'adegatk', name: 'Vinhos', icon: '🍷', description: '', order: 3, isActive: true },
-  { id: 'cat-alcoolicas', storeId: 'adegatk', name: 'Bebidas alcoólicas', icon: '🍸', description: '', order: 4, isActive: true },
-  { id: 'cat-refrigerantes', storeId: 'adegatk', name: 'Refrigerantes', icon: '🥤', description: '', order: 5, isActive: true },
-  { id: 'cat-outras', storeId: 'adegatk', name: 'Outras bebidas', icon: '🧃', description: '', order: 6, isActive: true },
-  { id: 'cat-gelo', storeId: 'adegatk', name: 'Gelo', icon: '🧊', description: '', order: 7, isActive: true },
-  { id: 'cat-tabacaria', storeId: 'adegatk', name: 'Tabacaria', icon: '🚬', description: '', order: 8, isActive: true },
-  { id: 'cat-conveniencia', storeId: 'adegatk', name: 'Conveniência', icon: '🍫', description: '', order: 9, isActive: true },
-  { id: 'cat-combos', storeId: 'adegatk', name: 'Combos', icon: '🎁', description: '', order: 10, isActive: true },
+  { id: 'cat-cervejas', storeId: 'adegatk', name: 'Cervejas', icon: '🍺', description: 'Cervejas nacionais e importadas', order: 1, isActive: true },
+  { id: 'cat-destilados', storeId: 'adegatk', name: 'Destilados', icon: '🥃', description: 'Whiskies, gins, vodkas e cachaças', order: 2, isActive: true },
+  { id: 'cat-vinhos', storeId: 'adegatk', name: 'Vinhos & Espumantes', icon: '🍷', description: 'Rótulos finos e nacionais', order: 3, isActive: true },
+  { id: 'cat-alcoolicas', storeId: 'adegatk', name: 'Bebidas alcoólicas', icon: '🍸', description: 'Ice, licores e aperitivos', order: 4, isActive: true },
+  { id: 'cat-refrigerantes', storeId: 'adegatk', name: 'Refrigerantes & Sucos', icon: '🥤', description: 'Refrigerantes e sucos gelados', order: 5, isActive: true },
+  { id: 'cat-outras', storeId: 'adegatk', name: 'Outras bebidas', icon: '🧃', description: 'Energéticos, água mineral e tônica', order: 6, isActive: true },
+  { id: 'cat-gelo', storeId: 'adegatk', name: 'Gelo & Carvão', icon: '🧊', description: 'Gelo em cubos, filtrado e de sabor', order: 7, isActive: true },
+  { id: 'cat-tabacaria', storeId: 'adegatk', name: 'Tabacaria & Sedas', icon: '🚬', description: 'Cigarros, sedas e acessórios', order: 8, isActive: true },
+  { id: 'cat-conveniencia', storeId: 'adegatk', name: 'Conveniência & Petiscos', icon: '🍫', description: 'Salgadinhos, amendoins e chocolates', order: 9, isActive: true },
+  { id: 'cat-combos', storeId: 'adegatk', name: 'Combos & Kits', icon: '🎁', description: 'Combos de destilados com energético', order: 10, isActive: true },
 ];
 
-// Clean empty collections for production use (Requirement #2)
+// Clean empty collections for production use (Requirement #1 & #2)
 export const INITIAL_PRODUCTS: Product[] = [];
 export const INITIAL_COMBOS: Combo[] = [];
-export const INITIAL_DELIVERY_ZONES: DeliveryZone[] = [];
 export const INITIAL_ORDERS: Order[] = [];
+export const INITIAL_CUSTOMERS: Customer[] = [];
+export const INITIAL_EXPENSES: Expense[] = [];
 
 // Primary Administrator initialized for the store owner
 export const INITIAL_USERS: AdminUser[] = [
   {
-    id: 'user-primary-admin',
-    name: 'Administrador AdegaTK',
+    id: 'user-primary-owner',
+    name: 'Proprietário AdegaTK',
     email: 'tkadega85@gmail.com',
     role: 'admin',
     storeId: 'adegatk',
     isActive: true,
+    permissions: {
+      canManageCatalog: true,
+      canManageOrders: true,
+      canManageFinances: true,
+      canManageUsers: true,
+      canManageSettings: true,
+    },
   },
 ];

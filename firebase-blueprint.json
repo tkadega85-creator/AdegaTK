@@ -1,0 +1,183 @@
+{
+  "entities": {
+    "store": {
+      "title": "Store",
+      "description": "Commercial store profile and settings",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "slug": { "type": "string" },
+        "slogan": { "type": "string" },
+        "description": { "type": "string" },
+        "phone": { "type": "string" },
+        "whatsappNumber": { "type": "string" },
+        "address": { "type": "string" },
+        "neighborhood": { "type": "string" },
+        "city": { "type": "string" },
+        "state": { "type": "string" },
+        "zipCode": { "type": "string" },
+        "minOrderValue": { "type": "number" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "name"]
+    },
+    "category": {
+      "title": "Category",
+      "description": "Product category",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "storeId": { "type": "string" },
+        "name": { "type": "string" },
+        "icon": { "type": "string" },
+        "description": { "type": "string" },
+        "order": { "type": "number" },
+        "isActive": { "type": "boolean" }
+      },
+      "required": ["id", "storeId", "name"]
+    },
+    "product": {
+      "title": "Product",
+      "description": "Drink or grocery product item",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "storeId": { "type": "string" },
+        "categoryId": { "type": "string" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "price": { "type": "number" },
+        "promoPrice": { "type": "number" },
+        "imageUrl": { "type": "string" },
+        "inStock": { "type": "boolean" },
+        "stockQuantity": { "type": "number" },
+        "isActive": { "type": "boolean" },
+        "isFeatured": { "type": "boolean" },
+        "isBestSeller": { "type": "boolean" },
+        "isPromo": { "type": "boolean" },
+        "order": { "type": "number" }
+      },
+      "required": ["id", "storeId", "categoryId", "name", "price"]
+    },
+    "combo": {
+      "title": "Combo",
+      "description": "Bundle or kit promotion",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "storeId": { "type": "string" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "originalPrice": { "type": "number" },
+        "promoPrice": { "type": "number" },
+        "imageUrl": { "type": "string" },
+        "isActive": { "type": "boolean" }
+      },
+      "required": ["id", "storeId", "name", "promoPrice"]
+    },
+    "order": {
+      "title": "Order",
+      "description": "Store customer order for in-store pickup",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "orderNumber": { "type": "number" },
+        "storeId": { "type": "string" },
+        "customerName": { "type": "string" },
+        "customerPhone": { "type": "string" },
+        "deliveryType": { "type": "string", "enum": ["retirada", "balcao"] },
+        "paymentMethod": { "type": "string", "enum": ["pix", "dinheiro", "cartao_credito", "cartao_debito"] },
+        "changeFor": { "type": "number" },
+        "subtotal": { "type": "number" },
+        "deliveryFee": { "type": "number" },
+        "discount": { "type": "number" },
+        "total": { "type": "number" },
+        "status": { "type": "string", "enum": ["novo", "confirmado", "preparando", "pronto_retirada", "finalizado", "cancelado"] },
+        "customerNotes": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "orderNumber", "storeId", "customerName", "customerPhone", "paymentMethod", "total", "status"]
+    },
+    "expense": {
+      "title": "Expense",
+      "description": "Store operational expense or cost",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "storeId": { "type": "string" },
+        "description": { "type": "string" },
+        "category": { "type": "string", "enum": ["Fornecedores", "Aluguel", "Energia/Água", "Funcionários", "Embalagens", "Manutenção", "Outros"] },
+        "amount": { "type": "number" },
+        "date": { "type": "string" },
+        "notes": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "storeId", "description", "category", "amount", "date"]
+    },
+    "customer": {
+      "title": "Customer",
+      "description": "Customer contact and purchase summary",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "storeId": { "type": "string" },
+        "name": { "type": "string" },
+        "phone": { "type": "string" },
+        "email": { "type": "string" },
+        "totalOrders": { "type": "number" },
+        "totalSpent": { "type": "number" },
+        "lastOrderAt": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "storeId", "name", "phone"]
+    },
+    "admin": {
+      "title": "Admin",
+      "description": "Authorized administrator account metadata",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "email": { "type": "string" },
+        "role": { "type": "string", "enum": ["admin", "gerente", "atendente"] },
+        "isActive": { "type": "boolean" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "email", "role"]
+    }
+  },
+  "firestore": {
+    "/stores/{storeId}": {
+      "schema": { "$ref": "#/entities/store" },
+      "description": "Commercial store info and business hours"
+    },
+    "/categories/{categoryId}": {
+      "schema": { "$ref": "#/entities/category" },
+      "description": "Catalog categories"
+    },
+    "/products/{productId}": {
+      "schema": { "$ref": "#/entities/product" },
+      "description": "Catalog products and stock"
+    },
+    "/combos/{comboId}": {
+      "schema": { "$ref": "#/entities/combo" },
+      "description": "Promotional bundles"
+    },
+    "/orders/{orderId}": {
+      "schema": { "$ref": "#/entities/order" },
+      "description": "Customer pickup orders"
+    },
+    "/expenses/{expenseId}": {
+      "schema": { "$ref": "#/entities/expense" },
+      "description": "Operational expenses for financial control"
+    },
+    "/customers/{customerId}": {
+      "schema": { "$ref": "#/entities/customer" },
+      "description": "Customer directory"
+    },
+    "/admins/{adminId}": {
+      "schema": { "$ref": "#/entities/admin" },
+      "description": "System admin roles and permissions"
+    }
+  }
+}

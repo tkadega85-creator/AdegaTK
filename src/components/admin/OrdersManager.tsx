@@ -4,14 +4,16 @@ import { Order, OrderStatus } from '../../types';
 import {
   ShoppingBag,
   MessageCircle,
-  Truck,
   Store as StoreIcon,
   Clock,
   MapPin,
   CheckCircle2,
   AlertCircle,
   Trash2,
-  ExternalLink
+  ExternalLink,
+  QrCode,
+  Banknote,
+  CreditCard
 } from 'lucide-react';
 
 export const OrdersManager: React.FC = () => {
@@ -31,9 +33,9 @@ export const OrdersManager: React.FC = () => {
     { key: 'novo', label: 'Novos', count: orders.filter((o) => o.status === 'novo').length },
     { key: 'confirmado', label: 'Confirmados', count: orders.filter((o) => o.status === 'confirmado').length },
     { key: 'preparando', label: 'Em Preparo', count: orders.filter((o) => o.status === 'preparando').length },
-    { key: 'saiu_entrega', label: 'A Caminho', count: orders.filter((o) => o.status === 'saiu_entrega').length },
-    { key: 'entregue', label: 'Entregues', count: orders.filter((o) => o.status === 'entregue').length },
-    { key: 'cancelado', label: 'Cancelados', count: orders.filter((o) => o.status === 'cancelado').length },
+    { key: 'pronto_retirada', label: 'Prontos para Retirada', count: orders.filter((o) => o.status === 'pronto_retirada').length },
+    { key: 'finalizado', label: 'Finalizados no Balcão', count: orders.filter((o) => o.status === 'finalizado').length },
+    { key: 'cancelado', label: 'Cancelados / Estornados', count: orders.filter((o) => o.status === 'cancelado').length },
   ];
 
   const filteredOrders = orders.filter((o) => {
@@ -57,21 +59,21 @@ export const OrdersManager: React.FC = () => {
     preparando: {
       label: 'Em Preparação',
       badge: 'bg-purple-500/20 text-purple-300 border-purple-500/40',
-      next: 'saiu_entrega',
-      nextLabel: 'Despachar com Motoboy',
+      next: 'pronto_retirada',
+      nextLabel: 'Avisar: Pronto para Retirada',
     },
-    saiu_entrega: {
-      label: 'Saiu para Entrega',
-      badge: 'bg-indigo-500/20 text-indigo-300 border-indigo-500/40',
-      next: 'entregue',
-      nextLabel: 'Marcar como Entregue',
+    pronto_retirada: {
+      label: 'Pronto para Retirada',
+      badge: 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40',
+      next: 'finalizado',
+      nextLabel: 'Marcar como Entregue no Balcão',
     },
-    entregue: {
-      label: 'Entregue com Sucesso',
+    finalizado: {
+      label: 'Finalizado no Balcão',
       badge: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40',
     },
     cancelado: {
-      label: 'Cancelado',
+      label: 'Cancelado / Estornado',
       badge: 'bg-rose-500/20 text-rose-300 border-rose-500/40',
     },
   };
@@ -81,13 +83,17 @@ export const OrdersManager: React.FC = () => {
     let msg = `Olá, *${order.customerName}*! Aqui é da *${store.name}*.\n\n`;
 
     if (status === 'confirmado') {
-      msg += `✅ Seu pedido *#${order.orderNumber}* foi *CONFIRMADO* e já está entrando em separação!\n\nLogo te avisamos quando o motoboy sair!`;
-    } else if (status === 'saiu_entrega') {
-      msg += `🛵💨 Seu pedido *#${order.orderNumber}* já *SAIU PARA ENTREGA*!\n\nTempo estimado: ~${store.estimatedDeliveryTime}. Fique atento ao interfone ou portão!`;
-    } else if (status === 'entregue') {
-      msg += `🎉 Seu pedido *#${order.orderNumber}* foi marcado como *ENTREGUE*!\n\nEsperamos que curta bastante! Qualquer coisa estamos à disposição. Saúde! 🍻`;
+      msg += `✅ Seu pedido *#${order.orderNumber}* foi *CONFIRMADO* e já está entrando em separação!\n\nTe avisaremos assim que estiver geladíssimo pronto para retirada no balcão!`;
+    } else if (status === 'pronto_retirada') {
+      msg += `🍺 *SEU PEDIDO ESTÁ PRONTO PARA RETIRADA!*\n\nPedido: *#${order.orderNumber}*\nTotal: *R$ ${order.total.toFixed(2).replace('.', ',')}*\n`;
+      if (store.address) {
+        msg += `📍 Local de Retirada: ${store.address}${store.neighborhood ? `, ${store.neighborhood}` : ''}\n`;
+      }
+      msg += `Pode vir retirar no balcão da adega! Aguardamos você.`;
+    } else if (status === 'finalizado') {
+      msg += `🎉 Seu pedido *#${order.orderNumber}* foi finalizado e retirado no balcão!\n\nEsperamos que curta bastante! Qualquer coisa estamos à disposição. Saúde! 🍻`;
     } else {
-      msg += `Atualização sobre o seu pedido *#${order.orderNumber}*: status alterado para *${statusConfig[status].label}*.`;
+      msg += `Atualização sobre o seu pedido *#${order.orderNumber}*: status alterado para *${statusConfig[status]?.label || status}*.`;
     }
 
     return `https://wa.me/55${cleanPhone}?text=${encodeURIComponent(msg)}`;
@@ -99,10 +105,10 @@ export const OrdersManager: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-900 border border-slate-800 p-5 rounded-2xl">
         <div>
           <h1 className="text-xl sm:text-2xl font-black text-white">
-            Gerenciamento de Pedidos
+            Gerenciamento de Pedidos (Balcão)
           </h1>
           <p className="text-xs text-slate-400 mt-1">
-            Controle os pedidos em tempo real desde a chegada até a entrega final
+            Controle os pedidos em tempo real desde a chegada até a retirada no balcão da adega
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -148,7 +154,10 @@ export const OrdersManager: React.FC = () => {
           </div>
         ) : (
           filteredOrders.map((ord) => {
-            const cfg = statusConfig[ord.status];
+            const cfg = statusConfig[ord.status] || {
+              label: ord.status,
+              badge: 'bg-slate-800 text-slate-300 border-slate-700',
+            };
             const dateStr = new Date(ord.createdAt).toLocaleTimeString([], {
               hour: '2-digit',
               minute: '2-digit',
@@ -159,169 +168,152 @@ export const OrdersManager: React.FC = () => {
                 key={ord.id}
                 className="bg-slate-900 border border-slate-800 hover:border-slate-750 rounded-2xl p-4 sm:p-5 transition-all space-y-4"
               >
-                {/* Top Row: Order ID, Client, Date, Status */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-800/80">
+                {/* Header card: Number, Status & Time */}
+                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800/80 pb-3">
                   <div className="flex items-center gap-3">
-                    <span className="font-mono font-black text-lg text-white">
+                    <span className="font-mono text-base font-black text-white">
                       #{ord.orderNumber}
                     </span>
-                    <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-lg border ${cfg.badge}`}>
+                    <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold border ${cfg.badge}`}>
                       {cfg.label}
                     </span>
-                    <span className="text-xs text-slate-500 flex items-center gap-1">
-                      <Clock className="w-3 h-3" />
-                      {dateStr}
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20 text-[11px] font-semibold">
+                      <StoreIcon className="w-3 h-3" />
+                      <span>Retirada no Balcão</span>
                     </span>
                   </div>
 
-                  {/* Customer Quick contact */}
-                  <div className="flex items-center gap-3">
-                    <div className="text-right text-xs">
-                      <div className="font-bold text-slate-200">{ord.customerName}</div>
-                      <div className="text-[11px] text-slate-400">{ord.customerPhone}</div>
-                    </div>
-                    <a
-                      href={generateWhatsAppLink(ord)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="p-2 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 border border-emerald-500/30 transition-colors"
-                      title="Abrir no WhatsApp"
-                    >
-                      <MessageCircle className="w-4 h-4" />
-                    </a>
+                  <div className="flex items-center gap-2 text-xs text-slate-400">
+                    <Clock className="w-3.5 h-3.5 text-slate-500" />
+                    <span>{new Date(ord.createdAt).toLocaleDateString()} às {dateStr}</span>
                   </div>
                 </div>
 
-                {/* Middle: Items List & Details */}
+                {/* Customer & Items */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
-                  {/* Items */}
-                  <div className="md:col-span-2 space-y-1.5 bg-slate-950/60 p-3 rounded-xl border border-slate-800/60">
-                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
-                      Itens do Pedido ({ord.items.length}):
-                    </span>
-                    {ord.items.map((it, idx) => (
-                      <div key={idx} className="flex justify-between items-center text-slate-300">
-                        <span>
-                          <strong className="text-amber-400">{it.quantity}x</strong> {it.productName}
-                          {it.notes && <span className="text-slate-500 italic ml-1">({it.notes})</span>}
-                        </span>
-                        <span className="font-mono text-slate-400">
-                          R$ {it.totalPrice.toFixed(2).replace('.', ',')}
-                        </span>
-                      </div>
-                    ))}
-                    {ord.customerNotes && (
-                      <div className="mt-2 pt-2 border-t border-slate-800 text-amber-300/90 italic">
-                        Obs: "{ord.customerNotes}"
-                      </div>
-                    )}
+                  {/* Col 1: Customer */}
+                  <div className="space-y-1">
+                    <div className="text-slate-400 font-semibold uppercase text-[10px] tracking-wider">
+                      Cliente
+                    </div>
+                    <div className="font-extrabold text-white text-sm">
+                      {ord.customerName}
+                    </div>
+                    <div className="text-slate-300 font-mono">
+                      {ord.customerPhone}
+                    </div>
                   </div>
 
-                  {/* Delivery & Payment Info */}
-                  <div className="space-y-2 bg-slate-950/60 p-3 rounded-xl border border-slate-800/60">
-                    <div className="flex items-center gap-1.5 text-slate-300 font-semibold">
-                      {ord.deliveryType === 'delivery' ? (
-                        <>
-                          <Truck className="w-3.5 h-3.5 text-amber-500" />
-                          <span>Entrega Delivery</span>
-                        </>
-                      ) : (
-                        <>
-                          <StoreIcon className="w-3.5 h-3.5 text-sky-500" />
-                          <span>Retirada no Balcão</span>
-                        </>
-                      )}
+                  {/* Col 2: Order Items */}
+                  <div className="space-y-1.5 md:col-span-1">
+                    <div className="text-slate-400 font-semibold uppercase text-[10px] tracking-wider">
+                      Itens do Pedido ({ord.items.reduce((acc, i) => acc + i.quantity, 0)})
                     </div>
-
-                    {ord.address && (
-                      <p className="text-[11px] text-slate-400 leading-tight">
-                        {ord.address.street}, {ord.address.number}
-                        {ord.address.complement && ` (${ord.address.complement})`}
-                        <br />
-                        {ord.address.neighborhood} - {ord.address.city}
-                      </p>
-                    )}
-
-                    <div className="pt-2 border-t border-slate-800 text-[11px] space-y-0.5">
-                      <div className="flex justify-between text-slate-400">
-                        <span>Pagamento:</span>
-                        <span className="text-slate-200 uppercase font-bold">
-                          {ord.paymentMethod.replace('_', ' ')}
-                        </span>
-                      </div>
-                      {ord.changeFor && (
-                        <div className="flex justify-between text-slate-400">
-                          <span>Troco para:</span>
-                          <span className="text-amber-400 font-bold">
-                            R$ {ord.changeFor.toFixed(2).replace('.', ',')}
+                    <div className="space-y-1">
+                      {ord.items.map((it, idx) => (
+                        <div key={idx} className="flex justify-between text-slate-200">
+                          <span>
+                            <strong className="text-amber-400">{it.quantity}x</strong> {it.productName}
+                          </span>
+                          <span className="font-mono text-slate-400">
+                            R$ {it.totalPrice.toFixed(2).replace('.', ',')}
                           </span>
                         </div>
-                      )}
-                      <div className="flex justify-between text-xs font-black text-white pt-1">
-                        <span>Total:</span>
-                        <span className="text-amber-400 text-sm">
-                          R$ {ord.total.toFixed(2).replace('.', ',')}
+                      ))}
+                    </div>
+                    {ord.customerNotes && (
+                      <p className="text-[11px] text-amber-300/90 italic bg-amber-500/5 p-2 rounded-lg border border-amber-500/20 mt-1">
+                        Obs: "{ord.customerNotes}"
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Col 3: Payment & Total */}
+                  <div className="space-y-2 bg-slate-950/60 p-3 rounded-xl border border-slate-800">
+                    <div className="flex justify-between text-slate-400">
+                      <span>Subtotal:</span>
+                      <span className="font-mono text-slate-200">
+                        R$ {ord.subtotal.toFixed(2).replace('.', ',')}
+                      </span>
+                    </div>
+
+                    <div className="flex justify-between text-sm font-black text-white pt-1 border-t border-slate-800">
+                      <span>Total:</span>
+                      <span className="text-amber-400">
+                        R$ {ord.total.toFixed(2).replace('.', ',')}
+                      </span>
+                    </div>
+
+                    <div className="text-[11px] text-slate-400 flex items-center justify-between pt-1">
+                      <span>Pagamento:</span>
+                      <span className="uppercase font-bold text-slate-200">
+                        {ord.paymentMethod.replace('_', ' ')}
+                      </span>
+                    </div>
+                    {ord.paymentMethod === 'dinheiro' && ord.changeFor && (
+                      <div className="text-[10px] text-amber-400 flex justify-between">
+                        <span>Troco para:</span>
+                        <span className="font-mono font-bold">
+                          R$ {ord.changeFor.toFixed(2).replace('.', ',')}
                         </span>
                       </div>
-                    </div>
+                    )}
                   </div>
                 </div>
 
-                {/* Bottom Actions: Next Status Button & Status Selector */}
-                <div className="pt-2 flex flex-wrap items-center justify-between gap-3">
+                {/* Actions bottom bar */}
+                <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-800">
                   <div className="flex items-center gap-2">
-                    <span className="text-xs text-slate-400 font-medium">Alterar Status:</span>
+                    {/* Status Changer */}
+                    <span className="text-xs text-slate-400 font-semibold">Alterar Status:</span>
                     <select
                       value={ord.status}
                       onChange={(e) => updateOrderStatus(ord.id, e.target.value as OrderStatus)}
-                      className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-amber-500"
+                      className="bg-slate-950 border border-slate-750 text-slate-200 rounded-xl px-2.5 py-1 text-xs font-bold focus:outline-none focus:border-amber-500"
                     >
                       <option value="novo">Novo</option>
                       <option value="confirmado">Confirmado</option>
-                      <option value="preparando">Em Preparo</option>
-                      <option value="saiu_entrega">Saiu para Entrega</option>
-                      <option value="entregue">Entregue</option>
-                      <option value="cancelado">Cancelado</option>
+                      <option value="preparando">Em Preparação</option>
+                      <option value="pronto_retirada">Pronto para Retirada</option>
+                      <option value="finalizado">Finalizado no Balcão</option>
+                      <option value="cancelado">Cancelado / Estornado</option>
                     </select>
+
+                    {/* Quick Next Step Button */}
+                    {cfg.next && cfg.nextLabel && (
+                      <button
+                        onClick={() => updateOrderStatus(ord.id, cfg.next!)}
+                        className="px-3 py-1 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs rounded-xl shadow-sm transition-all cursor-pointer"
+                      >
+                        {cfg.nextLabel}
+                      </button>
+                    )}
                   </div>
 
                   <div className="flex items-center gap-2">
-                    {/* Notify client on WhatsApp button */}
+                    {/* Status Update on WhatsApp */}
                     <a
                       href={generateStatusMessageWhatsApp(ord, ord.status)}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-750 text-slate-200 text-xs font-semibold rounded-xl border border-slate-700 transition-colors"
-                      title="Enviar aviso de status no WhatsApp do cliente"
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/40 text-emerald-400 rounded-xl text-xs font-bold transition-all"
+                      title="Notificar cliente sobre o status atual no WhatsApp"
                     >
-                      <MessageCircle className="w-3.5 h-3.5 text-emerald-400" />
-                      <span>Avisar Cliente</span>
+                      <MessageCircle className="w-3.5 h-3.5" />
+                      <span>Avisar no WhatsApp</span>
                     </a>
 
-                    {/* Next step quick advance */}
-                    {cfg.next && (
-                      <button
-                        onClick={() => {
-                          updateOrderStatus(ord.id, cfg.next!);
-                        }}
-                        className="flex items-center gap-1.5 px-3.5 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-black rounded-xl shadow transition-colors cursor-pointer"
-                      >
-                        <CheckCircle2 className="w-3.5 h-3.5" />
-                        <span>{cfg.nextLabel}</span>
-                      </button>
-                    )}
-
-                    {/* Delete order */}
+                    {/* Delete order (with confirm) */}
                     <button
                       onClick={() => {
-                        if (confirm(`Excluir pedido #${ord.orderNumber}?`)) {
+                        if (confirm(`Tem certeza que deseja excluir o Pedido #${ord.orderNumber}?`)) {
                           deleteOrder(ord.id);
                         }
                       }}
                       className="p-1.5 text-slate-500 hover:text-rose-400 hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
-                      title="Excluir Pedido"
+                      title="Excluir Registro de Pedido"
                     >
-                      <Trash2 className="w-3.5 h-3.5" />
+                      <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
                 </div>

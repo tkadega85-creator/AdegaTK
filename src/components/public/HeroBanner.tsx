@@ -36,7 +36,7 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({
         {/* Brand pill */}
         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-semibold mb-4 backdrop-blur-sm">
           <Flame className="w-3.5 h-3.5 text-amber-500" />
-          <span>{store.name || 'Adega'} • Delivery Oficial</span>
+          <span>{store.name || 'Adega'} • Cardápio & Retirada Oficial</span>
         </div>
 
         {/* Title & Slogan */}
@@ -58,7 +58,7 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({
         <div className="mt-6 flex flex-wrap items-center justify-center gap-2 sm:gap-4 text-xs font-medium text-slate-300">
           <div className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-slate-900/80 border border-slate-800">
             <Zap className="w-3.5 h-3.5 text-amber-400" />
-            <span>Entrega ~{store.estimatedDeliveryTime}</span>
+            <span>Retirada Rápida no Balcão</span>
           </div>
           <div className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-slate-900/80 border border-slate-800">
             <Snowflake className="w-3.5 h-3.5 text-cyan-400" />
@@ -66,7 +66,7 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({
           </div>
           <div className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-slate-900/80 border border-slate-800">
             <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-            <span>PIX ou Cartão na porta</span>
+            <span>PIX ou Cartão no Balcão</span>
           </div>
         </div>
 

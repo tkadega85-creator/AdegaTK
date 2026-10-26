@@ -30,7 +30,7 @@ export const Header: React.FC<HeaderProps> = ({
             <span className="truncate">
               {store.address
                 ? `${store.address}${store.neighborhood ? `, ${store.neighborhood}` : ''}${store.city ? ` • ${store.city}` : ''}`
-                : 'Atendimento & Delivery'}
+                : 'Atendimento & Retirada no Balcão'}
             </span>
           </div>
 
@@ -104,11 +104,11 @@ export const Header: React.FC<HeaderProps> = ({
                 {store.name || 'Adega'}
               </span>
               <span className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 bg-amber-500/20 text-amber-300 rounded border border-amber-500/30">
-                Delivery
+                Balcão
               </span>
             </div>
             <p className="text-xs text-slate-400 line-clamp-1 hidden sm:block">
-              {storeOpenStatusText} • Entrega em ~{store.estimatedDeliveryTime}
+              {storeOpenStatusText} • Retirada na Loja
             </p>
           </div>
         </div>

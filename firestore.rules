@@ -1,0 +1,84 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Default deny all access
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isStoreAdmin() {
+      return isSignedIn() && (
+        request.auth.token.email == "tkadega85@gmail.com" ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    // Stores collection: Public can read, only Admin can write
+    match /stores/{storeId} {
+      allow get: if true;
+      allow list: if true;
+      allow create, update, delete: if isStoreAdmin() && isValidId(storeId);
+    }
+
+    // Categories: Public can read active categories, Admin can manage
+    match /categories/{categoryId} {
+      allow get: if true;
+      allow list: if true;
+      allow create, update, delete: if isStoreAdmin() && isValidId(categoryId);
+    }
+
+    // Products: Public can read catalog, Admin can manage
+    match /products/{productId} {
+      allow get: if true;
+      allow list: if true;
+      allow create, update, delete: if isStoreAdmin() && isValidId(productId);
+    }
+
+    // Combos: Public can read, Admin can manage
+    match /combos/{comboId} {
+      allow get: if true;
+      allow list: if true;
+      allow create, update, delete: if isStoreAdmin() && isValidId(comboId);
+    }
+
+    // Orders: Anyone can submit a pickup order with valid payload; Admin manages
+    match /orders/{orderId} {
+      allow get: if isStoreAdmin() || (isSignedIn() && resource.data.customerPhone != null);
+      allow list: if isStoreAdmin();
+      allow create: if isValidId(orderId) &&
+        request.resource.data.keys().hasAll(['storeId', 'customerName', 'customerPhone', 'items', 'total', 'status']) &&
+        request.resource.data.customerName is string &&
+        request.resource.data.customerName.size() >= 2 &&
+        request.resource.data.customerPhone is string &&
+        request.resource.data.customerPhone.size() >= 8 &&
+        request.resource.data.total is number &&
+        request.resource.data.total >= 0 &&
+        request.resource.data.status in ['novo', 'confirmado', 'preparando', 'pronto_retirada', 'finalizado', 'cancelado'];
+      allow update, delete: if isStoreAdmin() && isValidId(orderId);
+    }
+
+    // Expenses: STRICT admin-only access (Confidential business financial data)
+    match /expenses/{expenseId} {
+      allow read, write: if isStoreAdmin() && isValidId(expenseId);
+    }
+
+    // Customers: Admin-only access to customer PII
+    match /customers/{customerId} {
+      allow read, write: if isStoreAdmin() && isValidId(customerId);
+    }
+
+    // Admins registry: Admin-only
+    match /admins/{adminId} {
+      allow read, write: if isStoreAdmin() && isValidId(adminId);
+    }
+  }
+}
