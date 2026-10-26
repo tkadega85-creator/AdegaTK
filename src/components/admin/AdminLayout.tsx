@@ -47,19 +47,48 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ onBackToStore }) => {
   const [activeTab, setActiveTab] = useState<string>('dashboard');
   const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
 
-  const menuItems = [
-    { id: 'dashboard', label: 'Dashboard Geral', icon: LayoutDashboard },
-    { id: 'orders', label: 'Pedidos (Balcão)', icon: ShoppingBag, badge: pendingOrdersCount },
-    { id: 'finances', label: 'Financeiro & Despesas', icon: DollarSign },
-    { id: 'products', label: 'Produtos', icon: Package },
-    { id: 'categories', label: 'Categorias', icon: Layers },
-    { id: 'combos', label: 'Combos & Kits', icon: Gift },
-    { id: 'payments', label: 'Formas de Pagamento', icon: CreditCard },
-    { id: 'hours', label: 'Horários da Loja', icon: Clock },
-    { id: 'store_info', label: 'Dados da Loja', icon: Store },
-    { id: 'appearance', label: 'Aparência & Tema', icon: Palette },
-    { id: 'users', label: 'Usuários & Permissões', icon: Users },
+  // Guard against unauthenticated or unauthorized access
+  if (!currentUser || (currentUser.role !== 'admin' && currentUser.role !== 'gerente')) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-6 text-center">
+        <div className="w-16 h-16 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-500 flex items-center justify-center mb-4">
+          <LogOut className="w-8 h-8" />
+        </div>
+        <h2 className="text-xl font-black text-white mb-2">Acesso Restrito ao Painel</h2>
+        <p className="text-sm text-slate-400 max-w-md mb-6">
+          É necessário autenticar-se com uma conta administrativa autorizada para acessar este sistema.
+        </p>
+        <button
+          onClick={onBackToStore}
+          className="px-6 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-sm rounded-xl cursor-pointer"
+        >
+          Voltar ao Cardápio Público
+        </button>
+      </div>
+    );
+  }
+
+  const canOrders = Boolean(currentUser.permissions?.canManageOrders ?? true);
+  const canFinances = Boolean(currentUser.permissions?.canManageFinances ?? (currentUser.role === 'admin'));
+  const canCatalog = Boolean(currentUser.permissions?.canManageCatalog ?? true);
+  const canSettings = Boolean(currentUser.permissions?.canManageSettings ?? (currentUser.role === 'admin'));
+  const canUsers = Boolean(currentUser.permissions?.canManageUsers ?? (currentUser.role === 'admin'));
+
+  const allMenuItems = [
+    { id: 'dashboard', label: 'Dashboard Geral', icon: LayoutDashboard, allowed: true },
+    { id: 'orders', label: 'Pedidos (Balcão)', icon: ShoppingBag, badge: pendingOrdersCount, allowed: canOrders },
+    { id: 'finances', label: 'Financeiro & Despesas', icon: DollarSign, allowed: canFinances },
+    { id: 'products', label: 'Produtos', icon: Package, allowed: canCatalog },
+    { id: 'categories', label: 'Categorias', icon: Layers, allowed: canCatalog },
+    { id: 'combos', label: 'Combos & Kits', icon: Gift, allowed: canCatalog },
+    { id: 'payments', label: 'Formas de Pagamento', icon: CreditCard, allowed: canSettings },
+    { id: 'hours', label: 'Horários da Loja', icon: Clock, allowed: canSettings },
+    { id: 'store_info', label: 'Dados da Loja', icon: Store, allowed: canSettings },
+    { id: 'appearance', label: 'Aparência & Tema', icon: Palette, allowed: canSettings },
+    { id: 'users', label: 'Usuários & Permissões', icon: Users, allowed: canUsers },
   ];
+
+  const menuItems = allMenuItems.filter((item) => item.allowed);
 
   const handleLogout = () => {
     logout();
@@ -71,25 +100,25 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ onBackToStore }) => {
       case 'dashboard':
         return <DashboardView onNavigateTab={(tab) => setActiveTab(tab)} />;
       case 'orders':
-        return <OrdersManager />;
+        return canOrders ? <OrdersManager /> : <div className="p-8 text-rose-400 font-bold">Acesso negado a pedidos.</div>;
       case 'finances':
-        return <FinancialManager />;
+        return canFinances ? <FinancialManager /> : <div className="p-8 text-rose-400 font-bold">Acesso restrito ao Administrador Geral.</div>;
       case 'products':
-        return <ProductsManager />;
+        return canCatalog ? <ProductsManager /> : <div className="p-8 text-rose-400 font-bold">Acesso negado ao catálogo.</div>;
       case 'categories':
-        return <CategoriesManager />;
+        return canCatalog ? <CategoriesManager /> : <div className="p-8 text-rose-400 font-bold">Acesso negado a categorias.</div>;
       case 'combos':
-        return <CombosManager />;
+        return canCatalog ? <CombosManager /> : <div className="p-8 text-rose-400 font-bold">Acesso negado a combos.</div>;
       case 'payments':
-        return <PaymentManager />;
+        return canSettings ? <PaymentManager /> : <div className="p-8 text-rose-400 font-bold">Acesso negado a pagamentos.</div>;
       case 'hours':
-        return <HoursManager />;
+        return canSettings ? <HoursManager /> : <div className="p-8 text-rose-400 font-bold">Acesso negado a horários.</div>;
       case 'store_info':
-        return <StoreInfoManager />;
+        return canSettings ? <StoreInfoManager /> : <div className="p-8 text-rose-400 font-bold">Acesso negado a dados da loja.</div>;
       case 'appearance':
-        return <AppearanceManager />;
+        return canSettings ? <AppearanceManager /> : <div className="p-8 text-rose-400 font-bold">Acesso negado a aparência.</div>;
       case 'users':
-        return <UsersManager />;
+        return canUsers ? <UsersManager /> : <div className="p-8 text-rose-400 font-bold">Acesso restrito ao Administrador Geral.</div>;
       default:
         return <DashboardView onNavigateTab={(tab) => setActiveTab(tab)} />;
     }

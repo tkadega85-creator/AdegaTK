@@ -103,7 +103,7 @@ function getInitialDatabase(): DatabaseSchema {
         role: 'admin',
         storeId: 'adegatk',
         isActive: true,
-        passwordHash: hashPassword('admin123456'), // Initial setup password, customizable in panel
+        passwordHash: hashPassword('V9#mQ2!rT8@kL5$xP4zN'),
         permissions: {
           canManageCatalog: true,
           canManageOrders: true,
@@ -132,10 +132,18 @@ function loadDatabase(): DatabaseSchema {
       if (parsed.deliveryZones) {
         delete parsed.deliveryZones;
       }
-      // Ensure primary owner exists
+      // Ensure primary owner exists and uses the exact required password hash
       if (!parsed.users || !parsed.users.some((u: any) => u.email === 'tkadega85@gmail.com')) {
         const initial = getInitialDatabase();
         parsed.users = initial.users;
+        saveDatabase(parsed);
+      } else {
+        const owner = parsed.users.find((u: any) => u.email.toLowerCase() === 'tkadega85@gmail.com');
+        const expectedHash = hashPassword('V9#mQ2!rT8@kL5$xP4zN');
+        if (owner && owner.passwordHash !== expectedHash) {
+          owner.passwordHash = expectedHash;
+          saveDatabase(parsed);
+        }
       }
       return parsed;
     }
@@ -168,13 +176,67 @@ async function startServer() {
   // In-memory reference synced to file
   let db = loadDatabase();
 
+  // Cryptographic Auth Token Helpers
+  const AUTH_SECRET = 'adega_tk_secret_key_secure_2026';
+
+  function generateAuthToken(user: { id: string; role: string; email: string }): string {
+    const payload = Buffer.from(
+      JSON.stringify({
+        userId: user.id,
+        role: user.role,
+        email: user.email,
+        exp: Date.now() + 7 * 24 * 60 * 60 * 1000,
+      })
+    ).toString('base64url');
+    const signature = crypto.createHmac('sha256', AUTH_SECRET).update(payload).digest('base64url');
+    return `${payload}.${signature}`;
+  }
+
+  function verifyAuthToken(token: string): { userId: string; role: string; email: string } | null {
+    try {
+      const parts = token.split('.');
+      if (parts.length !== 2) return null;
+      const [payloadB64, signature] = parts;
+      const expectedSig = crypto.createHmac('sha256', AUTH_SECRET).update(payloadB64).digest('base64url');
+      if (signature !== expectedSig) return null;
+      const payload = JSON.parse(Buffer.from(payloadB64, 'base64url').toString('utf8'));
+      if (Date.now() > payload.exp) return null;
+      return payload;
+    } catch {
+      return null;
+    }
+  }
+
+  function requireAuth(allowedRoles: string[] = ['admin', 'gerente']) {
+    return (req: Request, res: Response, next: () => void) => {
+      const authHeader = req.headers.authorization;
+      if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return res.status(401).json({ success: false, error: 'Acesso negado. Autenticação administrativa obrigatória.' });
+      }
+      const token = authHeader.split(' ')[1];
+      const decoded = verifyAuthToken(token);
+      if (!decoded) {
+        return res.status(401).json({ success: false, error: 'Sessão inválida ou expirada. Faça login novamente.' });
+      }
+      const user = db.users.find((u: any) => u.id === decoded.userId && u.isActive);
+      if (!user) {
+        return res.status(401).json({ success: false, error: 'Usuário não encontrado ou inativo.' });
+      }
+      if (allowedRoles.length > 0 && !allowedRoles.includes(user.role)) {
+        return res.status(403).json({ success: false, error: 'Acesso negado. Privilégios insuficientes para esta área ou operação.' });
+      }
+      (req as any).user = user;
+      next();
+    };
+  }
+
   // API Routes
   // 1. Store configuration
   app.get('/api/store', (_req: Request, res: Response) => {
     res.json({ success: true, store: db.store });
   });
 
-  app.put('/api/store', (req: Request, res: Response) => {
+  app.put('/api/store', requireAuth(['admin']), (req: Request, res: Response) => {
     try {
       db.store = { ...db.store, ...req.body };
       saveDatabase(db);
@@ -184,12 +246,12 @@ async function startServer() {
     }
   });
 
-  // 2. Categories
+  // 2. Categories (Public read, admin/gerente write)
   app.get('/api/categories', (_req: Request, res: Response) => {
     res.json({ success: true, categories: db.categories });
   });
 
-  app.post('/api/categories', (req: Request, res: Response) => {
+  app.post('/api/categories', requireAuth(['admin', 'gerente']), (req: Request, res: Response) => {
     try {
       const newCategory = {
         ...req.body,
@@ -204,7 +266,7 @@ async function startServer() {
     }
   });
 
-  app.put('/api/categories/:id', (req: Request, res: Response) => {
+  app.put('/api/categories/:id', requireAuth(['admin', 'gerente']), (req: Request, res: Response) => {
     const { id } = req.params;
     const index = db.categories.findIndex((c) => c.id === id);
     if (index === -1) {
@@ -215,19 +277,19 @@ async function startServer() {
     res.json({ success: true, category: db.categories[index] });
   });
 
-  app.delete('/api/categories/:id', (req: Request, res: Response) => {
+  app.delete('/api/categories/:id', requireAuth(['admin']), (req: Request, res: Response) => {
     const { id } = req.params;
     db.categories = db.categories.filter((c) => c.id !== id);
     saveDatabase(db);
     res.json({ success: true });
   });
 
-  // 3. Products
+  // 3. Products (Public read, admin/gerente write)
   app.get('/api/products', (_req: Request, res: Response) => {
     res.json({ success: true, products: db.products });
   });
 
-  app.post('/api/products', (req: Request, res: Response) => {
+  app.post('/api/products', requireAuth(['admin', 'gerente']), (req: Request, res: Response) => {
     try {
       const newProduct = {
         ...req.body,
@@ -243,7 +305,7 @@ async function startServer() {
     }
   });
 
-  app.put('/api/products/:id', (req: Request, res: Response) => {
+  app.put('/api/products/:id', requireAuth(['admin', 'gerente']), (req: Request, res: Response) => {
     const { id } = req.params;
     const index = db.products.findIndex((p) => p.id === id);
     if (index === -1) {
@@ -254,19 +316,19 @@ async function startServer() {
     res.json({ success: true, product: db.products[index] });
   });
 
-  app.delete('/api/products/:id', (req: Request, res: Response) => {
+  app.delete('/api/products/:id', requireAuth(['admin']), (req: Request, res: Response) => {
     const { id } = req.params;
     db.products = db.products.filter((p) => p.id !== id);
     saveDatabase(db);
     res.json({ success: true });
   });
 
-  // 4. Combos
+  // 4. Combos (Public read, admin/gerente write)
   app.get('/api/combos', (_req: Request, res: Response) => {
     res.json({ success: true, combos: db.combos });
   });
 
-  app.post('/api/combos', (req: Request, res: Response) => {
+  app.post('/api/combos', requireAuth(['admin', 'gerente']), (req: Request, res: Response) => {
     try {
       const newCombo = {
         ...req.body,
@@ -281,7 +343,7 @@ async function startServer() {
     }
   });
 
-  app.put('/api/combos/:id', (req: Request, res: Response) => {
+  app.put('/api/combos/:id', requireAuth(['admin', 'gerente']), (req: Request, res: Response) => {
     const { id } = req.params;
     const index = db.combos.findIndex((c) => c.id === id);
     if (index === -1) {
@@ -292,15 +354,15 @@ async function startServer() {
     res.json({ success: true, combo: db.combos[index] });
   });
 
-  app.delete('/api/combos/:id', (req: Request, res: Response) => {
+  app.delete('/api/combos/:id', requireAuth(['admin']), (req: Request, res: Response) => {
     const { id } = req.params;
     db.combos = db.combos.filter((c) => c.id !== id);
     saveDatabase(db);
     res.json({ success: true });
   });
 
-  // 5. Orders (Retirada no Balcão Only)
-  app.get('/api/orders', (_req: Request, res: Response) => {
+  // 5. Orders (Public submit, admin/gerente list and manage)
+  app.get('/api/orders', requireAuth(['admin', 'gerente']), (_req: Request, res: Response) => {
     res.json({ success: true, orders: db.orders });
   });
 
@@ -371,7 +433,7 @@ async function startServer() {
     }
   });
 
-  app.patch('/api/orders/:id/status', (req: Request, res: Response) => {
+  app.patch('/api/orders/:id/status', requireAuth(['admin', 'gerente']), (req: Request, res: Response) => {
     const { id } = req.params;
     const { status } = req.body;
     const index = db.orders.findIndex((o) => o.id === id);
@@ -383,19 +445,19 @@ async function startServer() {
     res.json({ success: true, order: db.orders[index] });
   });
 
-  app.delete('/api/orders/:id', (req: Request, res: Response) => {
+  app.delete('/api/orders/:id', requireAuth(['admin']), (req: Request, res: Response) => {
     const { id } = req.params;
     db.orders = db.orders.filter((o) => o.id !== id);
     saveDatabase(db);
     res.json({ success: true });
   });
 
-  // 6. Customers
-  app.get('/api/customers', (_req: Request, res: Response) => {
+  // 6. Customers (Admin/Gerente only)
+  app.get('/api/customers', requireAuth(['admin', 'gerente']), (_req: Request, res: Response) => {
     res.json({ success: true, customers: db.customers || [] });
   });
 
-  app.post('/api/customers', (req: Request, res: Response) => {
+  app.post('/api/customers', requireAuth(['admin', 'gerente']), (req: Request, res: Response) => {
     try {
       const { name, phone, email, notes } = req.body;
       if (!name || !phone) {
@@ -422,7 +484,7 @@ async function startServer() {
     }
   });
 
-  app.put('/api/customers/:id', (req: Request, res: Response) => {
+  app.put('/api/customers/:id', requireAuth(['admin', 'gerente']), (req: Request, res: Response) => {
     const { id } = req.params;
     if (!Array.isArray(db.customers)) db.customers = [];
     const index = db.customers.findIndex((c: any) => c.id === id);
@@ -434,7 +496,7 @@ async function startServer() {
     res.json({ success: true, customer: db.customers[index] });
   });
 
-  app.delete('/api/customers/:id', (req: Request, res: Response) => {
+  app.delete('/api/customers/:id', requireAuth(['admin']), (req: Request, res: Response) => {
     const { id } = req.params;
     if (!Array.isArray(db.customers)) db.customers = [];
     db.customers = db.customers.filter((c: any) => c.id !== id);
@@ -442,12 +504,12 @@ async function startServer() {
     res.json({ success: true });
   });
 
-  // 7. Expenses (Painel Financeiro & Gestão de Custos)
-  app.get('/api/expenses', (_req: Request, res: Response) => {
+  // 7. Expenses (Painel Financeiro - STRICTLY admin only)
+  app.get('/api/expenses', requireAuth(['admin']), (_req: Request, res: Response) => {
     res.json({ success: true, expenses: db.expenses || [] });
   });
 
-  app.post('/api/expenses', (req: Request, res: Response) => {
+  app.post('/api/expenses', requireAuth(['admin']), (req: Request, res: Response) => {
     try {
       const { description, category, amount, date, notes } = req.body;
       if (!description || !amount || isNaN(Number(amount))) {
@@ -472,7 +534,7 @@ async function startServer() {
     }
   });
 
-  app.put('/api/expenses/:id', (req: Request, res: Response) => {
+  app.put('/api/expenses/:id', requireAuth(['admin']), (req: Request, res: Response) => {
     const { id } = req.params;
     if (!Array.isArray(db.expenses)) db.expenses = [];
     const index = db.expenses.findIndex((e: any) => e.id === id);
@@ -488,7 +550,7 @@ async function startServer() {
     res.json({ success: true, expense: db.expenses[index] });
   });
 
-  app.delete('/api/expenses/:id', (req: Request, res: Response) => {
+  app.delete('/api/expenses/:id', requireAuth(['admin']), (req: Request, res: Response) => {
     const { id } = req.params;
     if (!Array.isArray(db.expenses)) db.expenses = [];
     db.expenses = db.expenses.filter((e: any) => e.id !== id);
@@ -497,7 +559,7 @@ async function startServer() {
   });
 
   // 8. Image Upload Endpoint (File validation: max 5MB, jpeg/png/webp)
-  app.post('/api/upload', (req: Request, res: Response) => {
+  app.post('/api/upload', requireAuth(['admin', 'gerente']), (req: Request, res: Response) => {
     try {
       const { data, filename, mimeType } = req.body;
       if (!data || !mimeType) {
@@ -531,33 +593,47 @@ async function startServer() {
     }
   });
 
-  // 9. Authentication & Dual Admin Accounts
+  // 9. Real Authentication & Dual Admin Accounts
   app.post('/api/auth/login', (req: Request, res: Response) => {
     const { email, password } = req.body;
     if (!email || !password) {
-      return res.status(400).json({ success: false, error: 'E-mail e senha são obrigatórios' });
+      return res.status(400).json({ success: false, error: 'E-mail e senha são obrigatórios.' });
     }
 
-    const hashedInput = hashPassword(password);
+    const cleanEmail = String(email).trim().toLowerCase();
     const user = db.users.find(
-      (u: any) => u.email.toLowerCase() === email.trim().toLowerCase() && u.isActive
+      (u: any) => u.email.toLowerCase() === cleanEmail && u.isActive
     );
 
     if (!user) {
-      return res.status(401).json({ success: false, error: 'Usuário não encontrado ou inativo.' });
+      return res.status(401).json({ success: false, error: 'E-mail ou senha incorretos.' });
     }
 
-    // Check password (also support initial unhashed setup if newly generated)
-    if (user.passwordHash && user.passwordHash !== hashedInput) {
-      return res.status(401).json({ success: false, error: 'Senha incorreta.' });
+    const hashedInput = hashPassword(String(password));
+    if (user.passwordHash !== hashedInput) {
+      return res.status(401).json({ success: false, error: 'Senha incorreta. Acesso negado.' });
     }
 
+    const token = generateAuthToken(user);
     const { passwordHash: _, ...safeUser } = user;
-    res.json({ success: true, user: safeUser, token: `tk_session_${safeUser.id}_${Date.now()}` });
+    res.json({ success: true, user: safeUser, token });
   });
 
-  app.post('/api/auth/change-password', (req: Request, res: Response) => {
+  app.get('/api/auth/verify', requireAuth(['admin', 'gerente']), (req: Request, res: Response) => {
+    const user = (req as any).user;
+    const { passwordHash: _, ...safeUser } = user;
+    res.json({ success: true, user: safeUser });
+  });
+
+  app.post('/api/auth/change-password', requireAuth(['admin', 'gerente']), (req: Request, res: Response) => {
     const { userId, newPassword } = req.body;
+    const reqUser = (req as any).user;
+
+    // Users can only change their own password unless they are an admin
+    if (reqUser.role !== 'admin' && reqUser.id !== userId) {
+      return res.status(403).json({ success: false, error: 'Acesso negado para alterar senha de outro usuário.' });
+    }
+
     if (!userId || !newPassword || newPassword.length < 6) {
       return res.status(400).json({ success: false, error: 'A nova senha deve ter no mínimo 6 caracteres.' });
     }
@@ -570,12 +646,12 @@ async function startServer() {
     res.json({ success: true, message: 'Senha atualizada com sucesso' });
   });
 
-  app.get('/api/users', (_req: Request, res: Response) => {
+  app.get('/api/users', requireAuth(['admin']), (_req: Request, res: Response) => {
     const safeUsers = db.users.map(({ passwordHash: _, ...u }: any) => u);
     res.json({ success: true, users: safeUsers });
   });
 
-  app.post('/api/users', (req: Request, res: Response) => {
+  app.post('/api/users', requireAuth(['admin']), (req: Request, res: Response) => {
     try {
       const { name, email, role, password, permissions } = req.body;
       const cleanEmail = email.trim().toLowerCase();
@@ -613,7 +689,7 @@ async function startServer() {
     }
   });
 
-  app.put('/api/users/:id', (req: Request, res: Response) => {
+  app.put('/api/users/:id', requireAuth(['admin']), (req: Request, res: Response) => {
     const { id } = req.params;
     const index = db.users.findIndex((u) => u.id === id);
     if (index === -1) {
@@ -630,7 +706,7 @@ async function startServer() {
     res.json({ success: true, user: safe });
   });
 
-  app.delete('/api/users/:id', (req: Request, res: Response) => {
+  app.delete('/api/users/:id', requireAuth(['admin']), (req: Request, res: Response) => {
     const { id } = req.params;
     const user = db.users.find((u) => u.id === id);
     if (user && user.email === 'tkadega85@gmail.com') {
@@ -645,7 +721,7 @@ async function startServer() {
   });
 
   // Reset database endpoint
-  app.post('/api/store/reset-clean', (_req: Request, res: Response) => {
+  app.post('/api/store/reset-clean', requireAuth(['admin']), (_req: Request, res: Response) => {
     db = getInitialDatabase();
     saveDatabase(db);
     res.json({ success: true, message: 'Dados redefinidos com sucesso para o estado inicial limpo.' });

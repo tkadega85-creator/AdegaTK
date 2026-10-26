@@ -188,7 +188,7 @@
       "role": "admin",
       "storeId": "adegatk",
       "isActive": true,
-      "passwordHash": "50d87db1aebec356b26cf5d697841ef998dd818619eb7614d6934c9c1e7d0a51",
+      "passwordHash": "e3b9cad29484444369efa9746a87018ac65e98aa0b05bd6c32123b5d7549234b",
       "permissions": {
         "canManageCatalog": true,
         "canManageOrders": true,

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
 import {
   Store,
   Category,
@@ -26,8 +26,9 @@ import {
   INITIAL_EXPENSES,
   INITIAL_USERS
 } from './mockData';
-import { db, handleFirestoreError, OperationType, testFirestoreConnection } from './firebase';
+import { db, handleFirestoreError, OperationType, testFirestoreConnection, storage } from './firebase';
 import { doc, setDoc, deleteDoc } from 'firebase/firestore';
+import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 
 const STORAGE_PREFIX = 'adegatk_v4_';
 
@@ -99,7 +100,10 @@ interface StoreContextType {
 
   // Admin Auth & Dual Accounts
   currentUser: AdminUser | null;
+  authToken: string | null;
   adminUsers: AdminUser[];
+  authFetch: (url: string, init?: RequestInit) => Promise<Response>;
+  uploadImage: (file: File) => Promise<string>;
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
   changePassword: (newPass: string) => Promise<{ success: boolean; error?: string }>;
@@ -162,6 +166,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [customers, setCustomers] = useState<Customer[]>(() => loadFromStorage('customers', INITIAL_CUSTOMERS));
   const [expenses, setExpenses] = useState<Expense[]>(() => loadFromStorage('expenses', INITIAL_EXPENSES));
   const [adminUsers, setAdminUsers] = useState<AdminUser[]>(() => loadFromStorage('users', INITIAL_USERS));
+  const [authToken, setAuthToken] = useState<string | null>(() => loadFromStorage('adega_auth_token', null));
   const [currentUser, setCurrentUser] = useState<AdminUser | null>(() => loadFromStorage('current_user', null));
   const [cart, setCart] = useState<CartItem[]>(() => loadFromStorage('cart', []));
   const [isLoading, setIsLoading] = useState(false);
@@ -177,28 +182,92 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   useEffect(() => { saveToStorage('expenses', expenses); }, [expenses]);
   useEffect(() => { saveToStorage('users', adminUsers); }, [adminUsers]);
   useEffect(() => { saveToStorage('current_user', currentUser); }, [currentUser]);
+  useEffect(() => { saveToStorage('adega_auth_token', authToken); }, [authToken]);
   useEffect(() => { saveToStorage('cart', cart); }, [cart]);
 
-  // Sync with backend API & test Firestore connection on mount
+  // Authenticated fetch helper
+  const authFetch = useCallback(
+    (url: string, init?: RequestInit) => {
+      const headers = new Headers(init?.headers || {});
+      const token = authToken || loadFromStorage('adega_auth_token', null);
+      if (token) {
+        headers.set('Authorization', `Bearer ${token}`);
+      }
+      return fetch(url, { ...init, headers });
+    },
+    [authToken]
+  );
+
+  // Refresh admin-protected datasets (orders, customers, expenses, users)
+  const refreshAdminData = useCallback(async (tokenOverride?: string) => {
+    const token = tokenOverride || authToken || loadFromStorage('adega_auth_token', null);
+    if (!token) return;
+    try {
+      const headers = { Authorization: `Bearer ${token}` };
+      const [resOrders, resCustomers, resExpenses, resUsers] = await Promise.all([
+        fetch('/api/orders', { headers }).then((r) => (r.ok ? r.json() : null)).catch(() => null),
+        fetch('/api/customers', { headers }).then((r) => (r.ok ? r.json() : null)).catch(() => null),
+        fetch('/api/expenses', { headers }).then((r) => (r.ok ? r.json() : null)).catch(() => null),
+        fetch('/api/users', { headers }).then((r) => (r.ok ? r.json() : null)).catch(() => null),
+      ]);
+      if (resOrders?.success && Array.isArray(resOrders.orders)) setOrders(resOrders.orders);
+      if (resCustomers?.success && Array.isArray(resCustomers.customers)) setCustomers(resCustomers.customers);
+      if (resExpenses?.success && Array.isArray(resExpenses.expenses)) setExpenses(resExpenses.expenses);
+      if (resUsers?.success && Array.isArray(resUsers.users)) setAdminUsers(resUsers.users);
+    } catch (err) {
+      console.warn('Erro ao atualizar dados administrativos:', err);
+    }
+  }, [authToken]);
+
+  // Strict session verification on mount: verify token against the backend
+  useEffect(() => {
+    let isMounted = true;
+    const token = authToken || loadFromStorage('adega_auth_token', null);
+    if (!token) {
+      setCurrentUser(null);
+      return;
+    }
+
+    fetch('/api/auth/verify', {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (!isMounted) return;
+        if (data.success && data.user) {
+          setCurrentUser(data.user);
+          refreshAdminData(token);
+        } else {
+          // Token is invalid, expired, or tampered - lock out immediately
+          setCurrentUser(null);
+          setAuthToken(null);
+          localStorage.removeItem('adega_auth_token');
+          localStorage.removeItem('current_user');
+        }
+      })
+      .catch(() => {
+        // Network or server error - do NOT allow unauthorized bypass
+        if (isMounted) setCurrentUser(null);
+      });
+
+    return () => { isMounted = false; };
+  }, [authToken, refreshAdminData]);
+
+  // Sync public catalog with backend API & test Firestore connection on mount
   useEffect(() => {
     let isMounted = true;
 
-    // Check Firebase connectivity
     testFirestoreConnection().then((connected) => {
       if (isMounted) setIsFirebaseConnected(connected);
     });
 
-    const fetchServerData = async () => {
+    const fetchPublicData = async () => {
       try {
-        const [resStore, resCats, resProds, resCombos, resOrders, resCustomers, resExpenses, resUsers] = await Promise.all([
+        const [resStore, resCats, resProds, resCombos] = await Promise.all([
           fetch('/api/store').then((r) => r.ok ? r.json() : null).catch(() => null),
           fetch('/api/categories').then((r) => r.ok ? r.json() : null).catch(() => null),
           fetch('/api/products').then((r) => r.ok ? r.json() : null).catch(() => null),
           fetch('/api/combos').then((r) => r.ok ? r.json() : null).catch(() => null),
-          fetch('/api/orders').then((r) => r.ok ? r.json() : null).catch(() => null),
-          fetch('/api/customers').then((r) => r.ok ? r.json() : null).catch(() => null),
-          fetch('/api/expenses').then((r) => r.ok ? r.json() : null).catch(() => null),
-          fetch('/api/users').then((r) => r.ok ? r.json() : null).catch(() => null),
         ]);
 
         if (!isMounted) return;
@@ -207,16 +276,12 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         if (resCats?.success && Array.isArray(resCats.categories)) setCategories(resCats.categories);
         if (resProds?.success && Array.isArray(resProds.products)) setProducts(resProds.products);
         if (resCombos?.success && Array.isArray(resCombos.combos)) setCombos(resCombos.combos);
-        if (resOrders?.success && Array.isArray(resOrders.orders)) setOrders(resOrders.orders);
-        if (resCustomers?.success && Array.isArray(resCustomers.customers)) setCustomers(resCustomers.customers);
-        if (resExpenses?.success && Array.isArray(resExpenses.expenses)) setExpenses(resExpenses.expenses);
-        if (resUsers?.success && Array.isArray(resUsers.users)) setAdminUsers(resUsers.users);
       } catch (err) {
         console.info('Using local client state sync.');
       }
     };
 
-    fetchServerData();
+    fetchPublicData();
     return () => { isMounted = false; };
   }, []);
 
@@ -267,7 +332,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const newStore = { ...store, ...updated };
     setStore(newStore);
     try {
-      await fetch('/api/store', {
+      await authFetch('/api/store', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newStore),
@@ -283,7 +348,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const newStore = { ...store, appearance: { ...store.appearance, ...appearance } };
     setStore(newStore);
     try {
-      await fetch('/api/store', {
+      await authFetch('/api/store', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newStore),
@@ -296,7 +361,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const newStore = { ...store, payments: { ...store.payments, ...payments } };
     setStore(newStore);
     try {
-      await fetch('/api/store', {
+      await authFetch('/api/store', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newStore),
@@ -309,7 +374,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const newStore = { ...store, businessHours: hours };
     setStore(newStore);
     try {
-      await fetch('/api/store', {
+      await authFetch('/api/store', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newStore),
@@ -327,7 +392,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     };
     setCategories((prev) => [...prev, newCategory]);
     try {
-      await fetch('/api/categories', {
+      await authFetch('/api/categories', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newCategory),
@@ -340,7 +405,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const updateCategory = async (id: string, updated: Partial<Category>) => {
     setCategories((prev) => prev.map((c) => (c.id === id ? { ...c, ...updated } : c)));
     try {
-      await fetch(`/api/categories/${id}`, {
+      await authFetch(`/api/categories/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updated),
@@ -352,7 +417,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const deleteCategory = async (id: string) => {
     setCategories((prev) => prev.filter((c) => c.id !== id));
     try {
-      await fetch(`/api/categories/${id}`, { method: 'DELETE' });
+      await authFetch(`/api/categories/${id}`, { method: 'DELETE' });
       await deleteDoc(doc(db, 'categories', id)).catch(() => {});
     } catch {}
   };
@@ -366,7 +431,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     };
     setProducts((prev) => [newProduct, ...prev]);
     try {
-      await fetch('/api/products', {
+      await authFetch('/api/products', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newProduct),
@@ -379,7 +444,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const updateProduct = async (id: string, updated: Partial<Product>) => {
     setProducts((prev) => prev.map((p) => (p.id === id ? { ...p, ...updated } : p)));
     try {
-      await fetch(`/api/products/${id}`, {
+      await authFetch(`/api/products/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updated),
@@ -391,7 +456,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const deleteProduct = async (id: string) => {
     setProducts((prev) => prev.filter((p) => p.id !== id));
     try {
-      await fetch(`/api/products/${id}`, { method: 'DELETE' });
+      await authFetch(`/api/products/${id}`, { method: 'DELETE' });
       await deleteDoc(doc(db, 'products', id)).catch(() => {});
     } catch {}
   };
@@ -407,7 +472,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     };
     setProducts((prev) => [duplicated, ...prev]);
     try {
-      await fetch('/api/products', {
+      await authFetch('/api/products', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(duplicated),
@@ -425,7 +490,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     };
     setCombos((prev) => [newCombo, ...prev]);
     try {
-      await fetch('/api/combos', {
+      await authFetch('/api/combos', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newCombo),
@@ -438,7 +503,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const updateCombo = async (id: string, updated: Partial<Combo>) => {
     setCombos((prev) => prev.map((c) => (c.id === id ? { ...c, ...updated } : c)));
     try {
-      await fetch(`/api/combos/${id}`, {
+      await authFetch(`/api/combos/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updated),
@@ -450,7 +515,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const deleteCombo = async (id: string) => {
     setCombos((prev) => prev.filter((c) => c.id !== id));
     try {
-      await fetch(`/api/combos/${id}`, { method: 'DELETE' });
+      await authFetch(`/api/combos/${id}`, { method: 'DELETE' });
       await deleteDoc(doc(db, 'combos', id)).catch(() => {});
     } catch {}
   };
@@ -601,7 +666,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const updateOrderStatus = async (orderId: string, status: OrderStatus) => {
     setOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, status } : o)));
     try {
-      await fetch(`/api/orders/${orderId}/status`, {
+      await authFetch(`/api/orders/${orderId}/status`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status }),
@@ -613,7 +678,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const deleteOrder = async (orderId: string) => {
     setOrders((prev) => prev.filter((o) => o.id !== orderId));
     try {
-      await fetch(`/api/orders/${orderId}`, { method: 'DELETE' });
+      await authFetch(`/api/orders/${orderId}`, { method: 'DELETE' });
       await deleteDoc(doc(db, 'orders', orderId)).catch(() => {});
     } catch {}
   };
@@ -632,7 +697,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     };
     setExpenses((prev) => [newExpense, ...prev]);
     try {
-      await fetch('/api/expenses', {
+      await authFetch('/api/expenses', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newExpense),
@@ -645,7 +710,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const updateExpense = async (id: string, updated: Partial<Expense>) => {
     setExpenses((prev) => prev.map((e) => (e.id === id ? { ...e, ...updated } : e)));
     try {
-      await fetch(`/api/expenses/${id}`, {
+      await authFetch(`/api/expenses/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updated),
@@ -657,7 +722,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const deleteExpense = async (id: string) => {
     setExpenses((prev) => prev.filter((e) => e.id !== id));
     try {
-      await fetch(`/api/expenses/${id}`, { method: 'DELETE' });
+      await authFetch(`/api/expenses/${id}`, { method: 'DELETE' });
       await deleteDoc(doc(db, 'expenses', id)).catch(() => {});
     } catch {}
   };
@@ -674,7 +739,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     };
     setCustomers((prev) => [newCust, ...prev]);
     try {
-      await fetch('/api/customers', {
+      await authFetch('/api/customers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newCust),
@@ -687,7 +752,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const updateCustomer = async (id: string, updated: Partial<Customer>) => {
     setCustomers((prev) => prev.map((c) => (c.id === id ? { ...c, ...updated } : c)));
     try {
-      await fetch(`/api/customers/${id}`, {
+      await authFetch(`/api/customers/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updated),
@@ -699,7 +764,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const deleteCustomer = async (id: string) => {
     setCustomers((prev) => prev.filter((c) => c.id !== id));
     try {
-      await fetch(`/api/customers/${id}`, { method: 'DELETE' });
+      await authFetch(`/api/customers/${id}`, { method: 'DELETE' });
       await deleteDoc(doc(db, 'customers', id)).catch(() => {});
     } catch {}
   };
@@ -760,48 +825,47 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return `https://wa.me/${cleanPhone}?text=${encoded}`;
   };
 
-  // Admin Auth & Dual Accounts
+  // Real Admin Auth & Dual Accounts (ZERO client bypass)
   const login = async (email: string, pass: string): Promise<{ success: boolean; error?: string }> => {
     try {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password: pass }),
+        body: JSON.stringify({ email: email.trim(), password: pass }),
       });
       const data = await res.json();
-      if (data.success && data.user) {
+      if (res.ok && data.success && data.user && data.token) {
+        setAuthToken(data.token);
         setCurrentUser(data.user);
+        await refreshAdminData(data.token);
         return { success: true };
       } else {
-        const user = adminUsers.find(
-          (u) => u.email.toLowerCase() === email.trim().toLowerCase() && u.isActive
-        );
-        if (user && (pass === 'admin' || pass === 'adegatk' || pass.length >= 4)) {
-          setCurrentUser(user);
-          return { success: true };
-        }
-        return { success: false, error: data.error || 'Credenciais inválidas.' };
+        setCurrentUser(null);
+        setAuthToken(null);
+        localStorage.removeItem('adega_auth_token');
+        localStorage.removeItem('current_user');
+        return { success: false, error: data.error || 'Credenciais inválidas. Verifique seu e-mail e senha.' };
       }
     } catch {
-      const user = adminUsers.find(
-        (u) => u.email.toLowerCase() === email.trim().toLowerCase() && u.isActive
-      );
-      if (user && (pass === 'admin' || pass === 'adegatk' || pass.length >= 4)) {
-        setCurrentUser(user);
-        return { success: true };
-      }
-      return { success: false, error: 'E-mail ou senha incorretos.' };
+      setCurrentUser(null);
+      setAuthToken(null);
+      localStorage.removeItem('adega_auth_token');
+      localStorage.removeItem('current_user');
+      return { success: false, error: 'Erro de comunicação ao validar credenciais. Tente novamente.' };
     }
   };
 
   const logout = () => {
     setCurrentUser(null);
+    setAuthToken(null);
+    localStorage.removeItem('adega_auth_token');
+    localStorage.removeItem('current_user');
   };
 
   const changePassword = async (newPass: string): Promise<{ success: boolean; error?: string }> => {
     if (!currentUser) return { success: false, error: 'Usuário não autenticado' };
     try {
-      const res = await fetch('/api/auth/change-password', {
+      const res = await authFetch('/api/auth/change-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId: currentUser.id, newPassword: newPass }),
@@ -809,31 +873,28 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       const data = await res.json();
       return data;
     } catch {
-      return { success: true };
+      return { success: false, error: 'Erro ao alterar a senha.' };
     }
   };
 
   const addUser = async (user: Omit<AdminUser, 'id' | 'storeId'> & { password?: string }) => {
-    const newUser: AdminUser = {
-      ...user,
-      id: `user-${Date.now()}`,
-      storeId: store.id,
-      createdAt: new Date().toISOString(),
-    };
-    setAdminUsers((prev) => [...prev, newUser]);
     try {
-      await fetch('/api/users', {
+      const res = await authFetch('/api/users', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(user),
       });
+      const data = await res.json();
+      if (data.success && data.user) {
+        setAdminUsers((prev) => [...prev, data.user]);
+      }
     } catch {}
   };
 
   const updateUser = async (id: string, updated: Partial<AdminUser> & { password?: string }) => {
     setAdminUsers((prev) => prev.map((u) => (u.id === id ? { ...u, ...updated } : u)));
     try {
-      await fetch(`/api/users/${id}`, {
+      await authFetch(`/api/users/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updated),
@@ -844,11 +905,66 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const deleteUser = async (id: string) => {
     setAdminUsers((prev) => prev.filter((u) => u.id !== id));
     try {
-      await fetch(`/api/users/${id}`, { method: 'DELETE' });
+      await authFetch(`/api/users/${id}`, { method: 'DELETE' });
     } catch {}
   };
 
+  const uploadImage = async (file: File): Promise<string> => {
+    // 1. First attempt Firebase Storage if available
+    try {
+      const fileExt = file.name.split('.').pop() || 'jpg';
+      const storagePath = `uploads/${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${fileExt}`;
+      const storageRef = ref(storage, storagePath);
+      const uploadTask = uploadBytesResumable(storageRef, file);
+      const url = await new Promise<string>((resolve, reject) => {
+        uploadTask.on(
+          'state_changed',
+          () => {},
+          (err) => reject(err),
+          async () => {
+            const downloadUrl = await getDownloadURL(uploadTask.snapshot.ref);
+            resolve(downloadUrl);
+          }
+        );
+      });
+      return url;
+    } catch (fbErr) {
+      console.info('Firebase Storage upload failed, falling back to authenticated server upload:', fbErr);
+      // 2. Fallback to server endpoint with authenticated authFetch
+      return new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = async () => {
+          try {
+            const base64Data = reader.result as string;
+            const res = await authFetch('/api/upload', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                data: base64Data,
+                filename: file.name,
+                mimeType: file.type,
+              }),
+            });
+            const json = await res.json();
+            if (res.ok && json.success && json.url) {
+              resolve(json.url);
+            } else {
+              reject(new Error(json.error || 'Falha ao processar upload da foto no servidor.'));
+            }
+          } catch (e: any) {
+            reject(new Error(e?.message || 'Erro de comunicação ao enviar foto'));
+          }
+        };
+        reader.onerror = () => reject(new Error('Erro ao ler arquivo da foto'));
+        reader.readAsDataURL(file);
+      });
+    }
+  };
+
   const resetToCleanDefaults = async () => {
+    try {
+      await authFetch('/api/store/reset-clean', { method: 'POST' });
+    } catch {}
     setStore(INITIAL_STORE);
     setCategories(INITIAL_CATEGORIES);
     setProducts([]);
@@ -858,10 +974,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setExpenses([]);
     setAdminUsers(INITIAL_USERS);
     setCart([]);
-    localStorage.clear();
-    try {
-      await fetch('/api/store/reset-clean', { method: 'POST' });
-    } catch {}
+    logout();
   };
 
   return (
@@ -909,7 +1022,10 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         cartTotalCount,
         generateWhatsAppLink,
         currentUser,
+        authToken,
         adminUsers,
+        authFetch,
+        uploadImage,
         login,
         logout,
         changePassword,

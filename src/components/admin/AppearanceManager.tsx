@@ -1,15 +1,19 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useStore } from '../../services/storeContext';
-import { Palette, Image as ImageIcon, Sparkles, Check } from 'lucide-react';
+import { Palette, Image as ImageIcon, Sparkles, Check, Upload, Loader2 } from 'lucide-react';
 
 export const AppearanceManager: React.FC = () => {
-  const { store, updateAppearance } = useStore();
+  const { store, updateAppearance, uploadImage } = useStore();
 
   const [theme, setTheme] = useState(store.appearance.theme);
   const [primaryColor, setPrimaryColor] = useState(store.appearance.primaryColor);
   const [logoUrl, setLogoUrl] = useState(store.appearance.logoUrl);
   const [bannerUrl, setBannerUrl] = useState(store.appearance.bannerUrl);
   const [savedSuccess, setSavedSuccess] = useState(false);
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false);
+  const [isUploadingBanner, setIsUploadingBanner] = useState(false);
+  const logoInputRef = useRef<HTMLInputElement>(null);
+  const bannerInputRef = useRef<HTMLInputElement>(null);
 
   const themePresets = [
     {
@@ -117,12 +121,53 @@ export const AppearanceManager: React.FC = () => {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="font-bold text-slate-300 block mb-1">
-                URL do Logotipo da Loja
-              </label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="font-bold text-slate-300 block">
+                  Logotipo da Loja
+                </label>
+                <button
+                  type="button"
+                  onClick={() => logoInputRef.current?.click()}
+                  disabled={isUploadingLogo}
+                  className="flex items-center gap-1.5 text-xs text-amber-400 hover:text-amber-300 font-semibold cursor-pointer disabled:opacity-50"
+                >
+                  {isUploadingLogo ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>Enviando...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="w-3.5 h-3.5" />
+                      <span>Fazer Upload</span>
+                    </>
+                  )}
+                </button>
+                <input
+                  type="file"
+                  ref={logoInputRef}
+                  accept="image/jpeg,image/png,image/webp"
+                  className="hidden"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    setIsUploadingLogo(true);
+                    try {
+                      const url = await uploadImage(file);
+                      setLogoUrl(url);
+                    } catch (err: any) {
+                      alert(err?.message || 'Erro ao enviar logo.');
+                    } finally {
+                      setIsUploadingLogo(false);
+                      if (logoInputRef.current) logoInputRef.current.value = '';
+                    }
+                  }}
+                />
+              </div>
               <input
                 type="url"
                 value={logoUrl}
+                placeholder="https://... ou faça upload acima"
                 onChange={(e) => setLogoUrl(e.target.value)}
                 className="w-full bg-slate-950 border border-slate-800 focus:border-amber-500 rounded-xl px-3 py-2 text-slate-100 focus:outline-none"
               />
@@ -139,12 +184,53 @@ export const AppearanceManager: React.FC = () => {
             </div>
 
             <div>
-              <label className="font-bold text-slate-300 block mb-1">
-                URL do Banner Hero Principal
-              </label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="font-bold text-slate-300 block">
+                  Banner Hero Principal
+                </label>
+                <button
+                  type="button"
+                  onClick={() => bannerInputRef.current?.click()}
+                  disabled={isUploadingBanner}
+                  className="flex items-center gap-1.5 text-xs text-amber-400 hover:text-amber-300 font-semibold cursor-pointer disabled:opacity-50"
+                >
+                  {isUploadingBanner ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>Enviando...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="w-3.5 h-3.5" />
+                      <span>Fazer Upload</span>
+                    </>
+                  )}
+                </button>
+                <input
+                  type="file"
+                  ref={bannerInputRef}
+                  accept="image/jpeg,image/png,image/webp"
+                  className="hidden"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    setIsUploadingBanner(true);
+                    try {
+                      const url = await uploadImage(file);
+                      setBannerUrl(url);
+                    } catch (err: any) {
+                      alert(err?.message || 'Erro ao enviar banner.');
+                    } finally {
+                      setIsUploadingBanner(false);
+                      if (bannerInputRef.current) bannerInputRef.current.value = '';
+                    }
+                  }}
+                />
+              </div>
               <input
                 type="url"
                 value={bannerUrl}
+                placeholder="https://... ou faça upload acima"
                 onChange={(e) => setBannerUrl(e.target.value)}
                 className="w-full bg-slate-950 border border-slate-800 focus:border-amber-500 rounded-xl px-3 py-2 text-slate-100 focus:outline-none"
               />

@@ -19,8 +19,6 @@ import {
   AlertCircle,
   Loader2
 } from 'lucide-react';
-import { storage } from '../../services/firebase';
-import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 
 export const ProductsManager: React.FC = () => {
   const {
@@ -30,6 +28,7 @@ export const ProductsManager: React.FC = () => {
     updateProduct,
     deleteProduct,
     duplicateProduct,
+    uploadImage,
   } = useStore();
 
   const [searchTerm, setSearchTerm] = useState('');
@@ -155,69 +154,15 @@ export const ProductsManager: React.FC = () => {
     }
 
     setIsUploading(true);
-    setUploadProgress(10);
+    setUploadProgress(25);
 
     try {
-      // 1. Try Firebase Storage upload first
-      try {
-        const fileExt = file.name.split('.').pop() || 'jpg';
-        const storagePath = `products/${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${fileExt}`;
-        const storageRef = ref(storage, storagePath);
-        const uploadTask = uploadBytesResumable(storageRef, file);
-
-        await new Promise<void>((resolve, reject) => {
-          uploadTask.on(
-            'state_changed',
-            (snapshot) => {
-              const progress = Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100);
-              setUploadProgress(progress);
-            },
-            (error) => {
-              console.warn('Firebase Storage direct upload error:', error);
-              reject(error);
-            },
-            async () => {
-              const downloadUrl = await getDownloadURL(uploadTask.snapshot.ref);
-              setImageUrl(downloadUrl);
-              resolve();
-            }
-          );
-        });
-        setIsUploading(false);
-        return;
-      } catch (fbErr) {
-        console.info('Falling back to local backend server upload proxy:', fbErr);
-      }
-
-      // 2. Fallback to local server upload endpoint
-      const reader = new FileReader();
-      reader.onload = async () => {
-        try {
-          const base64Data = reader.result as string;
-          const res = await fetch('/api/upload', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              data: base64Data,
-              filename: file.name,
-              mimeType: file.type,
-            }),
-          });
-          const json = await res.json();
-          if (json.success && json.url) {
-            setImageUrl(json.url);
-          } else {
-            setPhotoError(json.error || 'Falha ao processar upload da foto.');
-          }
-        } catch {
-          setPhotoError('Erro de conexão ao enviar a imagem.');
-        } finally {
-          setIsUploading(false);
-        }
-      };
-      reader.readAsDataURL(file);
-    } catch {
-      setPhotoError('Erro inesperado durante o upload da foto.');
+      const url = await uploadImage(file);
+      setImageUrl(url);
+      setUploadProgress(100);
+    } catch (err: any) {
+      setPhotoError(err?.message || 'Falha ao processar upload da foto.');
+    } finally {
       setIsUploading(false);
     }
   };

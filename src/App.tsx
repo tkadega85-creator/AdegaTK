@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { StoreProvider, useStore } from './services/storeContext';
 import { Header } from './components/public/Header';
 import { HeroBanner } from './components/public/HeroBanner';
@@ -74,8 +74,40 @@ const MainAppContent: React.FC = () => {
     });
   }, [products, categories, selectedCategoryId, searchQuery]);
 
+  // Strict URL & Route Guard for Admin Panel
+  useEffect(() => {
+    const checkUrlRoute = () => {
+      const hash = window.location.hash.toLowerCase();
+      const params = new URLSearchParams(window.location.search);
+      const isTryingAdmin =
+        hash === '#admin' ||
+        hash === '#/admin' ||
+        params.get('admin') === 'true' ||
+        params.get('view') === 'admin' ||
+        window.location.pathname.startsWith('/admin');
+
+      if (isTryingAdmin) {
+        if (currentUser && (currentUser.role === 'admin' || currentUser.role === 'gerente')) {
+          setViewMode('admin');
+        } else {
+          // Strictly reject direct unauthenticated access to admin
+          setViewMode('public');
+          setIsAdminLoginOpen(true);
+          // Strip unauthorized hash to prevent spoofing
+          if (window.location.hash.includes('admin')) {
+            window.history.replaceState(null, '', window.location.pathname + window.location.search);
+          }
+        }
+      }
+    };
+
+    checkUrlRoute();
+    window.addEventListener('hashchange', checkUrlRoute);
+    return () => window.removeEventListener('hashchange', checkUrlRoute);
+  }, [currentUser]);
+
   const handleOpenAdminLogin = () => {
-    if (currentUser) {
+    if (currentUser && (currentUser.role === 'admin' || currentUser.role === 'gerente')) {
       setViewMode('admin');
     } else {
       setIsAdminLoginOpen(true);
@@ -94,15 +126,24 @@ const MainAppContent: React.FC = () => {
     }
   };
 
-  // If in admin mode, show Admin layout
+  // If in admin mode, show Admin layout only if authenticated with valid role
   if (viewMode === 'admin') {
-    if (!currentUser) {
-      // Not logged in, redirect to public & open login
+    if (!currentUser || (currentUser.role !== 'admin' && currentUser.role !== 'gerente')) {
+      // Not logged in or unauthorized role: deny access and show login modal
       setViewMode('public');
       setIsAdminLoginOpen(true);
       return null;
     }
-    return <AdminLayout onBackToStore={() => setViewMode('public')} />;
+    return (
+      <AdminLayout
+        onBackToStore={() => {
+          if (window.location.hash.includes('admin')) {
+            window.history.replaceState(null, '', window.location.pathname);
+          }
+          setViewMode('public');
+        }}
+      />
+    );
   }
 
   const cleanPhone = store.whatsappNumber.replace(/\D/g, '');
