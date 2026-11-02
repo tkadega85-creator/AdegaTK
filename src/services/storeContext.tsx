@@ -26,8 +26,9 @@ import {
   INITIAL_EXPENSES,
   INITIAL_USERS
 } from './mockData';
-import { db, handleFirestoreError, OperationType, testFirestoreConnection, storage } from './firebase';
+import { db, handleFirestoreError, OperationType, testFirestoreConnection, storage, auth } from './firebase';
 import { doc, setDoc, deleteDoc, collection, onSnapshot } from 'firebase/firestore';
+import { signInWithEmailAndPassword, signOut } from 'firebase/auth';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 
 const STORAGE_PREFIX = 'adegatk_v4_';
@@ -1042,9 +1043,17 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return `https://wa.me/${cleanPhone}?text=${encoded}`;
   };
 
-  // Real Admin Auth & Dual Accounts (ZERO client bypass)
+  // Real Admin Auth & Dual Accounts (Firebase Auth + Cryptographic HMAC session)
   const login = async (email: string, pass: string): Promise<{ success: boolean; error?: string }> => {
     try {
+      // 1. Firebase Authentication client sign in
+      try {
+        await signInWithEmailAndPassword(auth, email.trim(), pass);
+      } catch (fbErr: any) {
+        console.info('Firebase Client Auth note:', fbErr?.code || fbErr?.message);
+      }
+
+      // 2. Verified backend token issuance
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1057,6 +1066,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         await refreshAdminData(data.token);
         return { success: true };
       } else {
+        try { await signOut(auth); } catch {}
         setCurrentUser(null);
         setAuthToken(null);
         localStorage.removeItem('adega_auth_token');
@@ -1064,6 +1074,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         return { success: false, error: data.error || 'Credenciais inválidas. Verifique seu e-mail e senha.' };
       }
     } catch {
+      try { await signOut(auth); } catch {}
       setCurrentUser(null);
       setAuthToken(null);
       localStorage.removeItem('adega_auth_token');
@@ -1073,6 +1084,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const logout = () => {
+    try { signOut(auth); } catch {}
     setCurrentUser(null);
     setAuthToken(null);
     localStorage.removeItem('adega_auth_token');

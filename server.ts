@@ -17,7 +17,7 @@ const FB_CONFIG_FILE = path.resolve(__dirname, 'firebase-applet-config.json');
 // Initialize Firebase client in server
 const firebaseConfig = JSON.parse(fs.readFileSync(FB_CONFIG_FILE, 'utf-8'));
 const fbApp = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
-const fbDb = firebaseConfig.firestoreDatabaseId ? getFirestore(fbApp, firebaseConfig.firestoreDatabaseId) : getFirestore(fbApp);
+const fbDb = firebaseConfig.firestoreDatabaseId && firebaseConfig.firestoreDatabaseId !== '(default)' ? getFirestore(fbApp, firebaseConfig.firestoreDatabaseId) : getFirestore(fbApp);
 const SYNC_TOKEN = 'adega_tk_internal_sync_2026';
 
 async function syncDocToFirestore(col: string, id: string, data: any) {

@@ -1,6 +1,7 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { getFirestore, doc, getDocFromServer } from 'firebase/firestore';
+import { getDatabase } from 'firebase/database';
 import { getStorage } from 'firebase/storage';
 import firebaseConfig from '../../firebase-applet-config.json';
 
@@ -8,7 +9,8 @@ import firebaseConfig from '../../firebase-applet-config.json';
 export const firebaseApp = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 
 const dbId = (firebaseConfig as { firestoreDatabaseId?: string }).firestoreDatabaseId;
-export const db = dbId ? getFirestore(firebaseApp, dbId) : getFirestore(firebaseApp);
+export const db = dbId && dbId !== '(default)' ? getFirestore(firebaseApp, dbId) : getFirestore(firebaseApp);
+export const rtdb = (firebaseConfig as { databaseURL?: string }).databaseURL ? getDatabase(firebaseApp) : null;
 export const auth = getAuth(firebaseApp);
 export const storage = getStorage(firebaseApp);
 

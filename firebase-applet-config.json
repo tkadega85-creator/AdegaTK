@@ -1,12 +1,11 @@
 {
-  "projectId": "gen-lang-client-0599307765",
-  "appId": "1:449660318581:web:e0f2e3d242829978c7593c",
-  "apiKey": "AIzaSyAEtZ62jzpbC0freY1mjyFi7i3vNrCHid8",
-  "authDomain": "gen-lang-client-0599307765.firebaseapp.com",
-  "firestoreDatabaseId": "ai-studio-adegatkcardpiodi-b32832dd-f5a5-4870-84ba-78a42401e9c0",
-  "storageBucket": "gen-lang-client-0599307765.firebasestorage.app",
-  "messagingSenderId": "449660318581",
-  "measurementId": "",
-  "oAuthClientId": "449660318581-gjia75t33qefjvb9qpvu98j87a8rfuck.apps.googleusercontent.com",
-  "recaptchaSiteKey": ""
+  "projectId": "adega-tk-dd960",
+  "appId": "1:775543921143:web:a6a2e9c788f00156e136f2",
+  "apiKey": "AIzaSyAGMWyZGaWV-dgs1YIiemmzKru7nsrm9hA",
+  "authDomain": "adega-tk-dd960.firebaseapp.com",
+  "databaseURL": "https://adega-tk-dd960-default-rtdb.firebaseio.com",
+  "firestoreDatabaseId": "(default)",
+  "storageBucket": "adega-tk-dd960.firebasestorage.app",
+  "messagingSenderId": "775543921143",
+  "measurementId": "G-PLLRBH3FKS"
 }
