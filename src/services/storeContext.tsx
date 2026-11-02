@@ -27,7 +27,7 @@ import {
   INITIAL_USERS
 } from './mockData';
 import { db, handleFirestoreError, OperationType, testFirestoreConnection, storage } from './firebase';
-import { doc, setDoc, deleteDoc } from 'firebase/firestore';
+import { doc, setDoc, deleteDoc, collection, onSnapshot } from 'firebase/firestore';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 
 const STORAGE_PREFIX = 'adegatk_v4_';
@@ -253,7 +253,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return () => { isMounted = false; };
   }, [authToken, refreshAdminData]);
 
-  // Sync public catalog with backend API & test Firestore connection on mount
+  // Real-time synchronization via Firestore onSnapshot & Server-Sent Events (SSE)
   useEffect(() => {
     let isMounted = true;
 
@@ -261,6 +261,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       if (isMounted) setIsFirebaseConnected(connected);
     });
 
+    // 1. Initial snapshot from backend REST API
     const fetchPublicData = async () => {
       try {
         const [resStore, resCats, resProds, resCombos] = await Promise.all([
@@ -276,13 +277,229 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         if (resCats?.success && Array.isArray(resCats.categories)) setCategories(resCats.categories);
         if (resProds?.success && Array.isArray(resProds.products)) setProducts(resProds.products);
         if (resCombos?.success && Array.isArray(resCombos.combos)) setCombos(resCombos.combos);
-      } catch (err) {
+      } catch {
         console.info('Using local client state sync.');
       }
     };
 
     fetchPublicData();
-    return () => { isMounted = false; };
+
+    // 2. Real-time Firestore onSnapshot Listeners
+    let unsubStore = () => {};
+    let unsubCats = () => {};
+    let unsubProds = () => {};
+    let unsubCombos = () => {};
+
+    try {
+      unsubStore = onSnapshot(
+        doc(db, 'stores', 'adegatk'),
+        (docSnap) => {
+          if (!isMounted) return;
+          if (docSnap.exists()) {
+            const data = docSnap.data() as Store;
+            setStore((prev) => ({ ...prev, ...data }));
+          }
+        },
+        (err) => console.warn('Store onSnapshot:', err.message)
+      );
+
+      unsubCats = onSnapshot(
+        collection(db, 'categories'),
+        (snapshot) => {
+          if (!isMounted) return;
+          if (!snapshot.empty) {
+            const cats: Category[] = [];
+            snapshot.forEach((d) => {
+              cats.push(d.data() as Category);
+            });
+            cats.sort((a, b) => (a.order || 0) - (b.order || 0));
+            setCategories(cats);
+          }
+        },
+        (err) => console.warn('Categories onSnapshot:', err.message)
+      );
+
+      unsubProds = onSnapshot(
+        collection(db, 'products'),
+        (snapshot) => {
+          if (!isMounted) return;
+          if (!snapshot.empty) {
+            const prods: Product[] = [];
+            snapshot.forEach((d) => {
+              prods.push(d.data() as Product);
+            });
+            setProducts(prods);
+          }
+        },
+        (err) => console.warn('Products onSnapshot:', err.message)
+      );
+
+      unsubCombos = onSnapshot(
+        collection(db, 'combos'),
+        (snapshot) => {
+          if (!isMounted) return;
+          if (!snapshot.empty) {
+            const cmbs: Combo[] = [];
+            snapshot.forEach((d) => {
+              cmbs.push(d.data() as Combo);
+            });
+            setCombos(cmbs);
+          }
+        },
+        (err) => console.warn('Combos onSnapshot:', err.message)
+      );
+    } catch (e) {
+      console.warn('Firestore real-time listeners notice:', e);
+    }
+
+    // 3. Server-Sent Events (SSE) for instant operational events (orders, expenses, customers)
+    let eventSource: EventSource | null = null;
+    try {
+      eventSource = new EventSource('/api/events');
+
+      eventSource.addEventListener('order_created', (e) => {
+        if (!isMounted) return;
+        try {
+          const order = JSON.parse(e.data);
+          setOrders((prev) => {
+            if (prev.some((o) => o.id === order.id)) return prev;
+            playChime();
+            return [order, ...prev];
+          });
+        } catch {}
+      });
+
+      eventSource.addEventListener('order_status_updated', (e) => {
+        if (!isMounted) return;
+        try {
+          const { id, status } = JSON.parse(e.data);
+          setOrders((prev) => prev.map((o) => (o.id === id ? { ...o, status } : o)));
+        } catch {}
+      });
+
+      eventSource.addEventListener('order_deleted', (e) => {
+        if (!isMounted) return;
+        try {
+          const { id } = JSON.parse(e.data);
+          setOrders((prev) => prev.filter((o) => o.id !== id));
+        } catch {}
+      });
+
+      eventSource.addEventListener('product_updated', (e) => {
+        if (!isMounted) return;
+        try {
+          const prod = JSON.parse(e.data);
+          setProducts((prev) => {
+            const idx = prev.findIndex((p) => p.id === prod.id);
+            if (idx >= 0) {
+              const copy = [...prev];
+              copy[idx] = prod;
+              return copy;
+            }
+            return [prod, ...prev];
+          });
+        } catch {}
+      });
+
+      eventSource.addEventListener('product_deleted', (e) => {
+        if (!isMounted) return;
+        try {
+          const { id } = JSON.parse(e.data);
+          setProducts((prev) => prev.filter((p) => p.id !== id));
+        } catch {}
+      });
+
+      eventSource.addEventListener('category_updated', (e) => {
+        if (!isMounted) return;
+        try {
+          const cat = JSON.parse(e.data);
+          setCategories((prev) => {
+            const idx = prev.findIndex((c) => c.id === cat.id);
+            if (idx >= 0) {
+              const copy = [...prev];
+              copy[idx] = cat;
+              return copy;
+            }
+            return [...prev, cat];
+          });
+        } catch {}
+      });
+
+      eventSource.addEventListener('category_deleted', (e) => {
+        if (!isMounted) return;
+        try {
+          const { id } = JSON.parse(e.data);
+          setCategories((prev) => prev.filter((c) => c.id !== id));
+        } catch {}
+      });
+
+      eventSource.addEventListener('customer_updated', (e) => {
+        if (!isMounted) return;
+        try {
+          const cust = JSON.parse(e.data);
+          setCustomers((prev) => {
+            const idx = prev.findIndex((c) => c.id === cust.id);
+            if (idx >= 0) {
+              const copy = [...prev];
+              copy[idx] = cust;
+              return copy;
+            }
+            return [cust, ...prev];
+          });
+        } catch {}
+      });
+
+      eventSource.addEventListener('customer_deleted', (e) => {
+        if (!isMounted) return;
+        try {
+          const { id } = JSON.parse(e.data);
+          setCustomers((prev) => prev.filter((c) => c.id !== id));
+        } catch {}
+      });
+
+      eventSource.addEventListener('expense_created', (e) => {
+        if (!isMounted) return;
+        try {
+          const exp = JSON.parse(e.data);
+          setExpenses((prev) => [exp, ...prev.filter((i) => i.id !== exp.id)]);
+        } catch {}
+      });
+
+      eventSource.addEventListener('expense_updated', (e) => {
+        if (!isMounted) return;
+        try {
+          const exp = JSON.parse(e.data);
+          setExpenses((prev) => prev.map((item) => (item.id === exp.id ? exp : item)));
+        } catch {}
+      });
+
+      eventSource.addEventListener('expense_deleted', (e) => {
+        if (!isMounted) return;
+        try {
+          const { id } = JSON.parse(e.data);
+          setExpenses((prev) => prev.filter((item) => item.id !== id));
+        } catch {}
+      });
+
+      eventSource.addEventListener('store_updated', (e) => {
+        if (!isMounted) return;
+        try {
+          const updatedStore = JSON.parse(e.data);
+          setStore(updatedStore);
+        } catch {}
+      });
+    } catch (sseErr) {
+      console.warn('SSE subscription notice:', sseErr);
+    }
+
+    return () => {
+      isMounted = false;
+      unsubStore();
+      unsubCats();
+      unsubProds();
+      unsubCombos();
+      if (eventSource) eventSource.close();
+    };
   }, []);
 
   // Business Hours calculation

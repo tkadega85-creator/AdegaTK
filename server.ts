@@ -3,6 +3,8 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import crypto from 'crypto';
+import { initializeApp, getApps, getApp } from 'firebase/app';
+import { getFirestore, doc, setDoc, deleteDoc } from 'firebase/firestore';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -10,6 +12,32 @@ const __dirname = path.dirname(__filename);
 const DATA_DIR = path.resolve(__dirname, 'data');
 const DB_FILE = path.resolve(DATA_DIR, 'store.json');
 const UPLOADS_DIR = path.resolve(__dirname, 'public', 'uploads');
+const FB_CONFIG_FILE = path.resolve(__dirname, 'firebase-applet-config.json');
+
+// Initialize Firebase client in server
+const firebaseConfig = JSON.parse(fs.readFileSync(FB_CONFIG_FILE, 'utf-8'));
+const fbApp = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
+const fbDb = firebaseConfig.firestoreDatabaseId ? getFirestore(fbApp, firebaseConfig.firestoreDatabaseId) : getFirestore(fbApp);
+const SYNC_TOKEN = 'adega_tk_internal_sync_2026';
+
+async function syncDocToFirestore(col: string, id: string, data: any) {
+  try {
+    await setDoc(doc(fbDb, col, id), {
+      ...data,
+      _syncToken: SYNC_TOKEN,
+    }, { merge: true });
+  } catch (err: any) {
+    console.warn(`Firestore sync error on ${col}/${id}:`, err?.message);
+  }
+}
+
+async function removeDocFromFirestore(col: string, id: string) {
+  try {
+    await deleteDoc(doc(fbDb, col, id));
+  } catch (err: any) {
+    console.warn(`Firestore delete error on ${col}/${id}:`, err?.message);
+  }
+}
 
 // Ensure data and uploads directories exist
 if (!fs.existsSync(DATA_DIR)) {
@@ -230,6 +258,34 @@ async function startServer() {
     };
   }
 
+  // Real-time Server-Sent Events (SSE) connections
+  const sseClients: Response[] = [];
+  function broadcastEvent(type: string, data: any) {
+    const payload = `event: ${type}\ndata: ${JSON.stringify(data)}\n\n`;
+    for (let i = sseClients.length - 1; i >= 0; i--) {
+      try {
+        sseClients[i].write(payload);
+      } catch {
+        sseClients.splice(i, 1);
+      }
+    }
+  }
+
+  // SSE Stream Endpoint
+  app.get('/api/events', (_req: Request, res: Response) => {
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no');
+    res.flushHeaders?.();
+    res.write(`event: connected\ndata: {}\n\n`);
+    sseClients.push(res);
+    _req.on('close', () => {
+      const idx = sseClients.indexOf(res);
+      if (idx !== -1) sseClients.splice(idx, 1);
+    });
+  });
+
   // API Routes
   // 1. Store configuration
   app.get('/api/store', (_req: Request, res: Response) => {
@@ -240,6 +296,8 @@ async function startServer() {
     try {
       db.store = { ...db.store, ...req.body };
       saveDatabase(db);
+      syncDocToFirestore('stores', db.store.id, db.store);
+      broadcastEvent('store_updated', db.store);
       res.json({ success: true, store: db.store });
     } catch (err: any) {
       res.status(500).json({ success: false, error: err.message });
@@ -260,6 +318,8 @@ async function startServer() {
       };
       db.categories.push(newCategory);
       saveDatabase(db);
+      syncDocToFirestore('categories', newCategory.id, newCategory);
+      broadcastEvent('category_updated', newCategory);
       res.status(201).json({ success: true, category: newCategory });
     } catch (err: any) {
       res.status(500).json({ success: false, error: err.message });
@@ -274,6 +334,8 @@ async function startServer() {
     }
     db.categories[index] = { ...db.categories[index], ...req.body };
     saveDatabase(db);
+    syncDocToFirestore('categories', id, db.categories[index]);
+    broadcastEvent('category_updated', db.categories[index]);
     res.json({ success: true, category: db.categories[index] });
   });
 
@@ -281,6 +343,8 @@ async function startServer() {
     const { id } = req.params;
     db.categories = db.categories.filter((c) => c.id !== id);
     saveDatabase(db);
+    removeDocFromFirestore('categories', id);
+    broadcastEvent('category_deleted', { id });
     res.json({ success: true });
   });
 
@@ -299,6 +363,8 @@ async function startServer() {
       };
       db.products.unshift(newProduct);
       saveDatabase(db);
+      syncDocToFirestore('products', newProduct.id, newProduct);
+      broadcastEvent('product_updated', newProduct);
       res.status(201).json({ success: true, product: newProduct });
     } catch (err: any) {
       res.status(500).json({ success: false, error: err.message });
@@ -313,6 +379,8 @@ async function startServer() {
     }
     db.products[index] = { ...db.products[index], ...req.body, updatedAt: new Date().toISOString() };
     saveDatabase(db);
+    syncDocToFirestore('products', id, db.products[index]);
+    broadcastEvent('product_updated', db.products[index]);
     res.json({ success: true, product: db.products[index] });
   });
 
@@ -320,6 +388,8 @@ async function startServer() {
     const { id } = req.params;
     db.products = db.products.filter((p) => p.id !== id);
     saveDatabase(db);
+    removeDocFromFirestore('products', id);
+    broadcastEvent('product_deleted', { id });
     res.json({ success: true });
   });
 
@@ -337,6 +407,8 @@ async function startServer() {
       };
       db.combos.unshift(newCombo);
       saveDatabase(db);
+      syncDocToFirestore('combos', newCombo.id, newCombo);
+      broadcastEvent('combo_updated', newCombo);
       res.status(201).json({ success: true, combo: newCombo });
     } catch (err: any) {
       res.status(500).json({ success: false, error: err.message });
@@ -351,6 +423,8 @@ async function startServer() {
     }
     db.combos[index] = { ...db.combos[index], ...req.body };
     saveDatabase(db);
+    syncDocToFirestore('combos', id, db.combos[index]);
+    broadcastEvent('combo_updated', db.combos[index]);
     res.json({ success: true, combo: db.combos[index] });
   });
 
@@ -358,6 +432,8 @@ async function startServer() {
     const { id } = req.params;
     db.combos = db.combos.filter((c) => c.id !== id);
     saveDatabase(db);
+    removeDocFromFirestore('combos', id);
+    broadcastEvent('combo_deleted', { id });
     res.json({ success: true });
   });
 
@@ -408,6 +484,8 @@ async function startServer() {
           if (newOrder.customerName && (!cust.name || cust.name === 'Cliente')) {
             cust.name = newOrder.customerName;
           }
+          syncDocToFirestore('customers', cust.id, cust);
+          broadcastEvent('customer_updated', cust);
         } else {
           const newCustomer = {
             id: `cust-${Date.now()}`,
@@ -422,11 +500,15 @@ async function startServer() {
             createdAt: newOrder.createdAt,
           };
           db.customers.unshift(newCustomer);
+          syncDocToFirestore('customers', newCustomer.id, newCustomer);
+          broadcastEvent('customer_updated', newCustomer);
         }
       }
 
       db.orders.unshift(newOrder);
       saveDatabase(db);
+      syncDocToFirestore('orders', newOrder.id, newOrder);
+      broadcastEvent('order_created', newOrder);
       res.status(201).json({ success: true, order: newOrder });
     } catch (err: any) {
       res.status(500).json({ success: false, error: err.message });
@@ -442,6 +524,8 @@ async function startServer() {
     }
     db.orders[index].status = status;
     saveDatabase(db);
+    syncDocToFirestore('orders', id, db.orders[index]);
+    broadcastEvent('order_status_updated', { id, status });
     res.json({ success: true, order: db.orders[index] });
   });
 
@@ -449,6 +533,8 @@ async function startServer() {
     const { id } = req.params;
     db.orders = db.orders.filter((o) => o.id !== id);
     saveDatabase(db);
+    removeDocFromFirestore('orders', id);
+    broadcastEvent('order_deleted', { id });
     res.json({ success: true });
   });
 
@@ -478,6 +564,8 @@ async function startServer() {
       };
       db.customers.unshift(newCustomer);
       saveDatabase(db);
+      syncDocToFirestore('customers', newCustomer.id, newCustomer);
+      broadcastEvent('customer_updated', newCustomer);
       res.status(201).json({ success: true, customer: newCustomer });
     } catch (err: any) {
       res.status(500).json({ success: false, error: err.message });
@@ -493,6 +581,8 @@ async function startServer() {
     }
     db.customers[index] = { ...db.customers[index], ...req.body };
     saveDatabase(db);
+    syncDocToFirestore('customers', id, db.customers[index]);
+    broadcastEvent('customer_updated', db.customers[index]);
     res.json({ success: true, customer: db.customers[index] });
   });
 
@@ -501,6 +591,8 @@ async function startServer() {
     if (!Array.isArray(db.customers)) db.customers = [];
     db.customers = db.customers.filter((c: any) => c.id !== id);
     saveDatabase(db);
+    removeDocFromFirestore('customers', id);
+    broadcastEvent('customer_deleted', { id });
     res.json({ success: true });
   });
 
@@ -528,6 +620,8 @@ async function startServer() {
       };
       db.expenses.unshift(newExpense);
       saveDatabase(db);
+      syncDocToFirestore('expenses', newExpense.id, newExpense);
+      broadcastEvent('expense_created', newExpense);
       res.status(201).json({ success: true, expense: newExpense });
     } catch (err: any) {
       res.status(500).json({ success: false, error: err.message });
@@ -547,6 +641,8 @@ async function startServer() {
       amount: req.body.amount !== undefined ? Math.abs(Number(req.body.amount)) : db.expenses[index].amount,
     };
     saveDatabase(db);
+    syncDocToFirestore('expenses', id, db.expenses[index]);
+    broadcastEvent('expense_updated', db.expenses[index]);
     res.json({ success: true, expense: db.expenses[index] });
   });
 
@@ -555,6 +651,8 @@ async function startServer() {
     if (!Array.isArray(db.expenses)) db.expenses = [];
     db.expenses = db.expenses.filter((e: any) => e.id !== id);
     saveDatabase(db);
+    removeDocFromFirestore('expenses', id);
+    broadcastEvent('expense_deleted', { id });
     res.json({ success: true });
   });
 
