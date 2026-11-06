@@ -247,6 +247,41 @@ async function startServer() {
   // In-memory reference synced to file
   let db = loadDatabase();
 
+  // Persist and synchronize authorized admins in Firestore database
+  const syncAdminsToFirestore = async () => {
+    try {
+      await syncDocToFirestore('admins', 'GRuT7NCuqwQmWgsSHjVLT4LfjFE2', {
+        id: 'GRuT7NCuqwQmWgsSHjVLT4LfjFE2',
+        uid: 'GRuT7NCuqwQmWgsSHjVLT4LfjFE2',
+        email: 'tkadega85@gmail.com',
+        role: 'admin',
+        isActive: true,
+        name: 'Proprietário AdegaTK',
+        storeId: 'adegatk',
+        authorizedAt: new Date().toISOString(),
+      });
+      await syncDocToFirestore('admins', 'OIl85ZhisXbsc3QB4Fx4GWs4IFf1', {
+        id: 'OIl85ZhisXbsc3QB4Fx4GWs4IFf1',
+        uid: 'OIl85ZhisXbsc3QB4Fx4GWs4IFf1',
+        email: 'tkadec85@gmail.com',
+        role: 'admin',
+        isActive: true,
+        name: 'Administrador AdegaTK',
+        storeId: 'adegatk',
+        authorizedAt: new Date().toISOString(),
+      });
+      await syncDocToFirestore('stores', 'adegatk', {
+        ...db.store,
+        adminEmails: ['tkadega85@gmail.com', 'tkadec85@gmail.com'],
+        ownerEmail: 'tkadega85@gmail.com',
+        adminUids: ['GRuT7NCuqwQmWgsSHjVLT4LfjFE2', 'OIl85ZhisXbsc3QB4Fx4GWs4IFf1'],
+      });
+    } catch (err: any) {
+      console.warn('Notice syncing admin authorization to Firestore:', err?.message);
+    }
+  };
+  syncAdminsToFirestore();
+
   // Cryptographic Auth Token Helpers
   const AUTH_SECRET = 'adega_tk_secret_key_secure_2026';
 

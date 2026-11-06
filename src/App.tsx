@@ -89,13 +89,22 @@ const MainAppContent: React.FC = () => {
       if (isTryingAdmin) {
         if (currentUser && (currentUser.role === 'admin' || currentUser.role === 'gerente')) {
           setViewMode('admin');
+          setIsAdminLoginOpen(false);
         } else {
-          // Strictly reject direct unauthenticated access to admin
-          setViewMode('public');
-          setIsAdminLoginOpen(true);
-          // Strip unauthorized hash to prevent spoofing
-          if (window.location.hash.includes('admin')) {
-            window.history.replaceState(null, '', window.location.pathname + window.location.search);
+          const hasStoredToken = Boolean(
+            localStorage.getItem('adegatk_v4_adega_auth_token') ||
+            localStorage.getItem('adega_auth_token')
+          );
+          // Only force login modal and strip hash if definitely not authenticated or validating
+          if (!hasStoredToken) {
+            setViewMode('public');
+            setIsAdminLoginOpen(true);
+            if (window.location.hash.includes('admin')) {
+              window.history.replaceState(null, '', window.location.pathname + window.location.search);
+            }
+          } else {
+            // Keep admin view pending token resolution
+            setViewMode('admin');
           }
         }
       }
@@ -109,6 +118,9 @@ const MainAppContent: React.FC = () => {
   const handleOpenAdminLogin = () => {
     if (currentUser && (currentUser.role === 'admin' || currentUser.role === 'gerente')) {
       setViewMode('admin');
+      if (!window.location.hash.includes('admin')) {
+        window.location.hash = '#admin';
+      }
     } else {
       setIsAdminLoginOpen(true);
     }
@@ -117,6 +129,9 @@ const MainAppContent: React.FC = () => {
   const handleAdminLoginSuccess = () => {
     setIsAdminLoginOpen(false);
     setViewMode('admin');
+    if (!window.location.hash.includes('admin')) {
+      window.location.hash = '#admin';
+    }
   };
 
   const scrollToMenu = () => {
@@ -128,6 +143,22 @@ const MainAppContent: React.FC = () => {
 
   // If in admin mode, show Admin layout only if authenticated with valid role
   if (viewMode === 'admin') {
+    const hasStoredToken = Boolean(
+      localStorage.getItem('adegatk_v4_adega_auth_token') ||
+      localStorage.getItem('adega_auth_token')
+    );
+
+    if (!currentUser && hasStoredToken) {
+      return (
+        <div className="min-h-screen bg-slate-950 flex items-center justify-center text-amber-500">
+          <div className="text-center space-y-3">
+            <div className="w-8 h-8 border-2 border-amber-500 border-t-transparent rounded-full animate-spin mx-auto" />
+            <p className="text-xs text-slate-400 font-medium">Validando autorização administrativa...</p>
+          </div>
+        </div>
+      );
+    }
+
     if (!currentUser || (currentUser.role !== 'admin' && currentUser.role !== 'gerente')) {
       // Not logged in or unauthorized role: deny access and show login modal
       setViewMode('public');
