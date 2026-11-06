@@ -141,6 +141,63 @@ async function runTestSuite() {
     'Login administrativo com sucesso e emissão de token HMAC seguro'
   );
 
+  // TEST 4B: Login with tkadec85@gmail.com
+  console.log('\n--- TESTE 4B: Autenticação real com tkadec85@gmail.com ---');
+  const loginTkadecRes = await request(
+    {
+      path: '/api/auth/login',
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    },
+    {
+      email: 'tkadec85@gmail.com',
+      password: 'V9#mQ2!rT8@kL5$xP4zN',
+    }
+  );
+  assert(
+    loginTkadecRes.status === 200 &&
+    loginTkadecRes.data.success === true &&
+    loginTkadecRes.data.user.email === 'tkadec85@gmail.com' &&
+    loginTkadecRes.data.user.role === 'admin',
+    'Login administrativo com tkadec85@gmail.com com sucesso'
+  );
+
+  // TEST 4C: Login with quoted password: "V9#mQ2!rT8@kL5$xP4zN"
+  console.log('\n--- TESTE 4C: Autenticação com senha entre aspas ---');
+  const loginQuotedRes = await request(
+    {
+      path: '/api/auth/login',
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    },
+    {
+      email: 'tkadega85@gmail.com',
+      password: '"V9#mQ2!rT8@kL5$xP4zN"',
+    }
+  );
+  assert(
+    loginQuotedRes.status === 200 && loginQuotedRes.data.success === true,
+    'Login aceita senha colada com aspas duplas ("...")'
+  );
+
+  // TEST 4D: Login with spaces around password: "  V9#mQ2!rT8@kL5$xP4zN  "
+  console.log('\n--- TESTE 4D: Autenticação com espaços nas pontas da senha ---');
+  const loginSpacedRes = await request(
+    {
+      path: '/api/auth/login',
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    },
+    {
+      email: 'tkadega85@gmail.com',
+      password: '  V9#mQ2!rT8@kL5$xP4zN  ',
+    }
+  );
+  assert(
+    loginSpacedRes.status === 200 && loginSpacedRes.data.success === true,
+    'Login aceita senha com espaços acidentais nas pontas'
+  );
+
   // TEST 5: Verify auth endpoint with valid token
   console.log('\n--- TESTE 5: Verificação de sessão (GET /api/auth/verify) ---');
   const verifyRes = await request({

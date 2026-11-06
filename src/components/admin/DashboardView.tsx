@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useStore } from '../../services/storeContext';
 import {
   ShoppingBag,
@@ -11,7 +11,12 @@ import {
   TrendingDown,
   MessageCircle,
   Store,
-  Receipt
+  Receipt,
+  StickyNote,
+  Save,
+  CheckCircle2,
+  Copy,
+  Check,
 } from 'lucide-react';
 
 interface DashboardViewProps {
@@ -19,7 +24,66 @@ interface DashboardViewProps {
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) => {
-  const { orders, products, store, expenses, updateOrderStatus, generateWhatsAppLink, isStoreCurrentlyOpen } = useStore();
+  const {
+    orders,
+    products,
+    store,
+    expenses,
+    updateOrderStatus,
+    generateWhatsAppLink,
+    isStoreCurrentlyOpen,
+    updateAdminNotes,
+  } = useStore();
+
+  const [noteContent, setNoteContent] = useState(store.adminNotes || '');
+  const [isSavingNote, setIsSavingNote] = useState(false);
+  const [hasCopiedNote, setHasCopiedNote] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('saved');
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Synchronize note in real-time when another device or tab updates it
+  useEffect(() => {
+    if (store.adminNotes !== undefined) {
+      setNoteContent(store.adminNotes);
+    }
+  }, [store.adminNotes]);
+
+  const handleNoteChange = (val: string) => {
+    setNoteContent(val);
+    setSaveStatus('saving');
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    saveTimeoutRef.current = setTimeout(async () => {
+      try {
+        setIsSavingNote(true);
+        await updateAdminNotes(val);
+        setSaveStatus('saved');
+      } catch (err) {
+        console.warn('Erro ao salvar nota pessoal:', err);
+      } finally {
+        setIsSavingNote(false);
+      }
+    }, 600);
+  };
+
+  const handleManualSave = async () => {
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    try {
+      setIsSavingNote(true);
+      setSaveStatus('saving');
+      await updateAdminNotes(noteContent);
+      setSaveStatus('saved');
+    } catch (err) {
+      console.warn('Erro ao salvar:', err);
+    } finally {
+      setIsSavingNote(false);
+    }
+  };
+
+  const handleCopyNote = () => {
+    navigator.clipboard?.writeText(noteContent);
+    setHasCopiedNote(true);
+    setTimeout(() => setHasCopiedNote(false), 2000);
+  };
 
   const validOrders = orders.filter((o) => o.status !== 'cancelado');
   const grossRevenue = validOrders.reduce((acc, o) => acc + o.total, 0);
@@ -235,6 +299,117 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
             <Receipt className="w-3.5 h-3.5" />
             <span>Consultar Painel Financeiro Completo</span>
           </button>
+        </div>
+      </div>
+
+      {/* Bloco de Notas Pessoais do Administrador (Sincronizado no Banco em Tempo Real) */}
+      <div className="bg-gradient-to-br from-slate-900 via-slate-900 to-amber-950/20 border border-amber-500/30 p-5 rounded-2xl shadow-xl space-y-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800/80 pb-3">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-amber-500/20 border border-amber-500/30 text-amber-400 flex items-center justify-center shrink-0">
+              <StickyNote className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="font-extrabold text-sm sm:text-base text-white">
+                  Nota Pessoal do Administrador
+                </h3>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                  Tempo Real
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-400">
+                Anotações, lembretes de estoque e recados salvos no banco de dados e sincronizados entre todos os aparelhos
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            {saveStatus === 'saving' ? (
+              <span className="text-[11px] text-amber-400 font-semibold flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping"></span>
+                Salvando no banco...
+              </span>
+            ) : (
+              <span className="text-[11px] text-emerald-400 font-medium flex items-center gap-1">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                Salvo no banco de dados
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={handleCopyNote}
+              title="Copiar texto da nota"
+              className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1"
+            >
+              {hasCopiedNote ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+              <span className="hidden sm:inline">{hasCopiedNote ? 'Copiado!' : 'Copiar'}</span>
+            </button>
+            <button
+              type="button"
+              onClick={handleManualSave}
+              disabled={isSavingNote}
+              className="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-slate-950 font-bold rounded-lg text-xs transition-colors cursor-pointer flex items-center gap-1.5 shadow-sm"
+            >
+              <Save className="w-3.5 h-3.5" />
+              <span>{isSavingNote ? 'Salvando...' : 'Salvar'}</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Textarea */}
+        <div className="relative">
+          <textarea
+            value={noteContent}
+            onChange={(e) => handleNoteChange(e.target.value)}
+            placeholder="Digite aqui anotações pessoais, recados para os atendentes, pendências de fornecedores, tarefas do dia ou lembretes da adega... Tudo que você digitar aqui é salvo automaticamente no banco de dados e atualizado instantaneamente em qualquer celular ou computador conectado."
+            rows={4}
+            className="w-full bg-slate-950/80 border border-slate-800 focus:border-amber-500 rounded-xl p-3 text-xs sm:text-sm text-slate-100 placeholder-slate-500 focus:outline-none transition-all resize-y font-sans leading-relaxed"
+          />
+        </div>
+
+        {/* Quick Snippets / Templates */}
+        <div className="flex flex-wrap items-center justify-between gap-2 pt-1 text-[11px]">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="text-slate-500">Adicionar rápido:</span>
+            <button
+              type="button"
+              onClick={() => {
+                const nowStr = new Date().toLocaleDateString('pt-BR');
+                handleNoteChange(noteContent ? `${noteContent}\n• [${nowStr}] Repor estoque urgente: ` : `• [${nowStr}] Repor estoque urgente: `);
+              }}
+              className="px-2 py-0.5 bg-slate-800/80 hover:bg-slate-750 text-slate-300 rounded-md border border-slate-700/60 transition-colors cursor-pointer"
+            >
+              + Repor Estoque
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                const nowStr = new Date().toLocaleDateString('pt-BR');
+                handleNoteChange(noteContent ? `${noteContent}\n• [${nowStr}] Contatar fornecedor: ` : `• [${nowStr}] Contatar fornecedor: `);
+              }}
+              className="px-2 py-0.5 bg-slate-800/80 hover:bg-slate-750 text-slate-300 rounded-md border border-slate-700/60 transition-colors cursor-pointer"
+            >
+              + Fornecedor
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                const nowStr = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+                handleNoteChange(noteContent ? `${noteContent}\n• [${nowStr}] Caixa / Lembrete: ` : `• [${nowStr}] Caixa / Lembrete: `);
+              }}
+              className="px-2 py-0.5 bg-slate-800/80 hover:bg-slate-750 text-slate-300 rounded-md border border-slate-700/60 transition-colors cursor-pointer"
+            >
+              + Lembrete Caixa
+            </button>
+          </div>
+
+          {store.adminNotesUpdatedAt && (
+            <span className="text-slate-500 text-[10px]">
+              Última sincronização: {new Date(store.adminNotesUpdatedAt).toLocaleString('pt-BR')}
+            </span>
+          )}
         </div>
       </div>
 

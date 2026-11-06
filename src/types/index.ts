@@ -202,4 +202,6 @@ export interface Store {
   appearance: StoreAppearance;
   businessHours: BusinessDayHours[];
   payments: PaymentMethodsConfig;
+  adminNotes?: string;
+  adminNotesUpdatedAt?: string;
 }

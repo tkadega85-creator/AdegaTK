@@ -40,6 +40,7 @@ interface StoreContextType {
   updateAppearance: (appearance: Partial<StoreAppearance>) => Promise<void>;
   updatePayments: (payments: Partial<PaymentMethodsConfig>) => Promise<void>;
   updateBusinessHours: (hours: BusinessDayHours[]) => Promise<void>;
+  updateAdminNotes: (notes: string) => Promise<void>;
   isStoreCurrentlyOpen: boolean;
   storeOpenStatusText: string;
 
@@ -601,6 +602,25 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     } catch {}
   };
 
+  const updateAdminNotes = async (notes: string) => {
+    const updatedAt = new Date().toISOString();
+    const newStore = { ...store, adminNotes: notes, adminNotesUpdatedAt: updatedAt };
+    setStore(newStore);
+    try {
+      await authFetch('/api/store', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ adminNotes: notes, adminNotesUpdatedAt: updatedAt }),
+      });
+      await setDoc(doc(db, 'stores', store.id), {
+        adminNotes: notes,
+        adminNotesUpdatedAt: updatedAt,
+      }, { merge: true }).catch(() => {});
+    } catch (err) {
+      console.warn('Sync admin notes notice:', err);
+    }
+  };
+
   // Categories CRUD
   const addCategory = async (cat: Omit<Category, 'id' | 'storeId'>): Promise<Category> => {
     const newCategory: Category = {
@@ -1045,40 +1065,55 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   // Real Admin Auth & Dual Accounts (Firebase Auth + Cryptographic HMAC session)
   const login = async (email: string, pass: string): Promise<{ success: boolean; error?: string }> => {
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanPass = pass.trim().replace(/^["'“”«»]|["'“”«»]$/g, '').trim();
+
     try {
-      // 1. Firebase Authentication client sign in
+      // 1. Firebase Authentication client sign in (try sanitized first, fallback to raw)
       try {
-        await signInWithEmailAndPassword(auth, email.trim(), pass);
+        await signInWithEmailAndPassword(auth, cleanEmail, cleanPass);
       } catch (fbErr: any) {
-        console.info('Firebase Client Auth note:', fbErr?.code || fbErr?.message);
+        try {
+          await signInWithEmailAndPassword(auth, cleanEmail, pass.trim());
+        } catch {
+          console.info('Firebase Client Auth note:', fbErr?.code || fbErr?.message);
+        }
       }
 
       // 2. Verified backend token issuance
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email.trim(), password: pass }),
+        body: JSON.stringify({ email: cleanEmail, password: cleanPass }),
       });
       const data = await res.json();
       if (res.ok && data.success && data.user && data.token) {
+        saveToStorage('adega_auth_token', data.token);
+        saveToStorage('current_user', data.user);
         setAuthToken(data.token);
         setCurrentUser(data.user);
-        await refreshAdminData(data.token);
+        try {
+          await refreshAdminData(data.token);
+        } catch {}
         return { success: true };
       } else {
         try { await signOut(auth); } catch {}
         setCurrentUser(null);
         setAuthToken(null);
-        localStorage.removeItem('adega_auth_token');
-        localStorage.removeItem('current_user');
+        saveToStorage('adega_auth_token', null);
+        saveToStorage('current_user', null);
+        localStorage.removeItem(STORAGE_PREFIX + 'adega_auth_token');
+        localStorage.removeItem(STORAGE_PREFIX + 'current_user');
         return { success: false, error: data.error || 'Credenciais inválidas. Verifique seu e-mail e senha.' };
       }
     } catch {
       try { await signOut(auth); } catch {}
       setCurrentUser(null);
       setAuthToken(null);
-      localStorage.removeItem('adega_auth_token');
-      localStorage.removeItem('current_user');
+      saveToStorage('adega_auth_token', null);
+      saveToStorage('current_user', null);
+      localStorage.removeItem(STORAGE_PREFIX + 'adega_auth_token');
+      localStorage.removeItem(STORAGE_PREFIX + 'current_user');
       return { success: false, error: 'Erro de comunicação ao validar credenciais. Tente novamente.' };
     }
   };
@@ -1087,8 +1122,10 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     try { signOut(auth); } catch {}
     setCurrentUser(null);
     setAuthToken(null);
-    localStorage.removeItem('adega_auth_token');
-    localStorage.removeItem('current_user');
+    saveToStorage('adega_auth_token', null);
+    saveToStorage('current_user', null);
+    localStorage.removeItem(STORAGE_PREFIX + 'adega_auth_token');
+    localStorage.removeItem(STORAGE_PREFIX + 'current_user');
   };
 
   const changePassword = async (newPass: string): Promise<{ success: boolean; error?: string }> => {
@@ -1214,6 +1251,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         updateAppearance,
         updatePayments,
         updateBusinessHours,
+        updateAdminNotes,
         isStoreCurrentlyOpen,
         storeOpenStatusText,
         categories,

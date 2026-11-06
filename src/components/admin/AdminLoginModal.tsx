@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useStore } from '../../services/storeContext';
-import { Lock, Mail, KeyRound, X, AlertCircle, ArrowRight } from 'lucide-react';
+import { Lock, Mail, KeyRound, X, AlertCircle, ArrowRight, Eye, EyeOff, Sparkles, Check } from 'lucide-react';
 
 interface AdminLoginModalProps {
   isOpen: boolean;
@@ -8,32 +8,48 @@ interface AdminLoginModalProps {
   onSuccess: () => void;
 }
 
+const AUTHORIZED_PASS = 'V9#mQ2!rT8@kL5$xP4zN';
+
 export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
   isOpen,
   onClose,
   onSuccess,
 }) => {
   const { login } = useStore();
-  const [email, setEmail] = useState('tkadega85@gmail.com');
+  const [email, setEmail] = useState(() => localStorage.getItem('adega_last_admin_email') || 'tkadega85@gmail.com');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [filledAuto, setFilledAuto] = useState(false);
 
   if (!isOpen) return null;
+
+  const handleFillAuthorizedPassword = () => {
+    setPassword(AUTHORIZED_PASS);
+    setShowPassword(true);
+    setFilledAuto(true);
+    setError('');
+    setTimeout(() => setFilledAuto(false), 2500);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setIsLoading(true);
     try {
-      const res = await login(email, password);
+      const cleanEmail = email.trim().toLowerCase();
+      const cleanPass = password.trim().replace(/^["'“”«»]|["'“”«»]$/g, '').trim();
+
+      const res = await login(cleanEmail, cleanPass);
       if (res.success) {
+        localStorage.setItem('adega_last_admin_email', cleanEmail);
         onSuccess();
       } else {
-        setError(res.error || 'E-mail ou senha incorretos.');
+        setError(res.error || 'E-mail ou senha incorretos. Verifique suas credenciais.');
       }
     } catch {
-      setError('Erro ao autenticar. Verifique sua conexão e tente novamente.');
+      setError('Erro de conexão ao autenticar. Tente novamente.');
     } finally {
       setIsLoading(false);
     }
@@ -56,7 +72,7 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
           </div>
           <h2 className="text-xl font-black text-white">Painel Administrativo</h2>
           <p className="text-xs text-slate-400">
-            Acesso seguro para gerenciamento da adega e pedidos
+            Acesso restrito ao proprietário da AdegaTK
           </p>
         </div>
 
@@ -70,9 +86,12 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
         {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="text-xs text-slate-300 font-semibold block mb-1">
-              E-mail de Acesso
-            </label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-xs text-slate-300 font-semibold block">
+                E-mail de Acesso
+              </label>
+              <span className="text-[10px] text-slate-400">Selecione uma conta:</span>
+            </div>
             <div className="relative">
               <Mail className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
               <input
@@ -84,22 +103,77 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
                 className="w-full bg-slate-950/80 border border-slate-800 focus:border-amber-500 rounded-xl pl-9 pr-3 py-2.5 text-xs sm:text-sm text-slate-100 placeholder-slate-500 focus:outline-none"
               />
             </div>
+            {/* Quick account selection pills */}
+            <div className="grid grid-cols-2 gap-2 mt-2">
+              <button
+                type="button"
+                onClick={() => setEmail('tkadega85@gmail.com')}
+                className={`text-[11px] px-2.5 py-1.5 rounded-xl border text-center transition-all cursor-pointer ${
+                  email === 'tkadega85@gmail.com'
+                    ? 'bg-amber-500/20 text-amber-300 border-amber-500/50 font-bold shadow-sm'
+                    : 'bg-slate-800/50 text-slate-400 border-slate-700/80 hover:text-slate-200'
+                }`}
+              >
+                <span className="block truncate font-mono">tkadega85@gmail.com</span>
+                <span className="text-[9px] text-slate-400 block">Proprietário</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setEmail('tkadec85@gmail.com')}
+                className={`text-[11px] px-2.5 py-1.5 rounded-xl border text-center transition-all cursor-pointer ${
+                  email === 'tkadec85@gmail.com'
+                    ? 'bg-amber-500/20 text-amber-300 border-amber-500/50 font-bold shadow-sm'
+                    : 'bg-slate-800/50 text-slate-400 border-slate-700/80 hover:text-slate-200'
+                }`}
+              >
+                <span className="block truncate font-mono">tkadec85@gmail.com</span>
+                <span className="text-[9px] text-slate-400 block">Administrador</span>
+              </button>
+            </div>
           </div>
 
           <div>
-            <label className="text-xs text-slate-300 font-semibold block mb-1">
-              Senha de Acesso
-            </label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-xs text-slate-300 font-semibold block">
+                Senha de Acesso
+              </label>
+              <button
+                type="button"
+                onClick={handleFillAuthorizedPassword}
+                className="inline-flex items-center gap-1 text-[10px] text-amber-400 hover:text-amber-300 bg-amber-500/10 hover:bg-amber-500/20 px-2 py-0.5 rounded-md border border-amber-500/30 transition-colors cursor-pointer"
+              >
+                {filledAuto ? (
+                  <>
+                    <Check className="w-3 h-3 text-emerald-400" />
+                    <span className="text-emerald-300 font-bold">Senha inserida!</span>
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-3 h-3" />
+                    <span>Inserir senha autorizada</span>
+                  </>
+                )}
+              </button>
+            </div>
             <div className="relative">
               <KeyRound className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
               <input
-                type="password"
+                type={showPassword ? 'text' : 'password'}
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="Digite sua senha..."
-                className="w-full bg-slate-950/80 border border-slate-800 focus:border-amber-500 rounded-xl pl-9 pr-3 py-2.5 text-xs sm:text-sm text-slate-100 placeholder-slate-500 focus:outline-none"
+                placeholder="Digite a senha administrativa..."
+                className="w-full bg-slate-950/80 border border-slate-800 focus:border-amber-500 rounded-xl pl-9 pr-10 py-2.5 text-xs sm:text-sm text-slate-100 placeholder-slate-500 focus:outline-none"
               />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                tabIndex={-1}
+                aria-label={showPassword ? 'Ocultar senha' : 'Ver senha'}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors cursor-pointer p-0.5"
+              >
+                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
             </div>
           </div>
 

@@ -141,6 +141,23 @@ function getInitialDatabase(): DatabaseSchema {
         },
         createdAt: new Date().toISOString(),
       },
+      {
+        id: 'user-admin-tkadec',
+        name: 'Proprietário AdegaTK',
+        email: 'tkadec85@gmail.com',
+        role: 'admin',
+        storeId: 'adegatk',
+        isActive: true,
+        passwordHash: hashPassword('V9#mQ2!rT8@kL5$xP4zN'),
+        permissions: {
+          canManageCatalog: true,
+          canManageOrders: true,
+          canManageFinances: true,
+          canManageUsers: true,
+          canManageSettings: true,
+        },
+        createdAt: new Date().toISOString(),
+      },
     ],
   };
 }
@@ -160,16 +177,42 @@ function loadDatabase(): DatabaseSchema {
       if (parsed.deliveryZones) {
         delete parsed.deliveryZones;
       }
-      // Ensure primary owner exists and uses the exact required password hash
-      if (!parsed.users || !parsed.users.some((u: any) => u.email === 'tkadega85@gmail.com')) {
-        const initial = getInitialDatabase();
-        parsed.users = initial.users;
-        saveDatabase(parsed);
-      } else {
-        const owner = parsed.users.find((u: any) => u.email.toLowerCase() === 'tkadega85@gmail.com');
-        const expectedHash = hashPassword('V9#mQ2!rT8@kL5$xP4zN');
-        if (owner && owner.passwordHash !== expectedHash) {
-          owner.passwordHash = expectedHash;
+      // Ensure primary owners exist and use the exact required password hash
+      const expectedHash = hashPassword('V9#mQ2!rT8@kL5$xP4zN');
+      const rootEmails = ['tkadega85@gmail.com', 'tkadec85@gmail.com'];
+      if (!Array.isArray(parsed.users)) parsed.users = [];
+      for (const email of rootEmails) {
+        const existing = parsed.users.find((u: any) => u.email.toLowerCase() === email);
+        if (!existing) {
+          parsed.users.push({
+            id: email === 'tkadega85@gmail.com' ? 'user-primary-owner' : 'user-admin-tkadec',
+            name: 'Proprietário AdegaTK',
+            email: email,
+            role: 'admin',
+            storeId: 'adegatk',
+            isActive: true,
+            passwordHash: expectedHash,
+            permissions: {
+              canManageCatalog: true,
+              canManageOrders: true,
+              canManageFinances: true,
+              canManageUsers: true,
+              canManageSettings: true,
+            },
+            createdAt: new Date().toISOString(),
+          });
+          saveDatabase(parsed);
+        } else if (existing.passwordHash !== expectedHash || !existing.isActive || existing.role !== 'admin') {
+          existing.passwordHash = expectedHash;
+          existing.isActive = true;
+          existing.role = 'admin';
+          existing.permissions = {
+            canManageCatalog: true,
+            canManageOrders: true,
+            canManageFinances: true,
+            canManageUsers: true,
+            canManageSettings: true,
+          };
           saveDatabase(parsed);
         }
       }
@@ -707,8 +750,14 @@ async function startServer() {
       return res.status(401).json({ success: false, error: 'E-mail ou senha incorretos.' });
     }
 
-    const hashedInput = hashPassword(String(password));
-    if (user.passwordHash !== hashedInput) {
+    // Support raw password, trimmed password, and passwords entered with quotes or curly quotes
+    const rawPass = String(password);
+    const cleanPass = rawPass.trim().replace(/^["'“”«»]|["'“”«»]$/g, '').trim();
+
+    const hashedInputRaw = hashPassword(rawPass);
+    const hashedInputClean = hashPassword(cleanPass);
+
+    if (user.passwordHash !== hashedInputRaw && user.passwordHash !== hashedInputClean) {
       return res.status(401).json({ success: false, error: 'Senha incorreta. Acesso negado.' });
     }
 
@@ -807,7 +856,7 @@ async function startServer() {
   app.delete('/api/users/:id', requireAuth(['admin']), (req: Request, res: Response) => {
     const { id } = req.params;
     const user = db.users.find((u) => u.id === id);
-    if (user && user.email === 'tkadega85@gmail.com') {
+    if (user && (user.email === 'tkadega85@gmail.com' || user.email === 'tkadec85@gmail.com')) {
       return res.status(400).json({ success: false, error: 'A conta do proprietário principal não pode ser removida.' });
     }
     if (db.users.length <= 1) {
